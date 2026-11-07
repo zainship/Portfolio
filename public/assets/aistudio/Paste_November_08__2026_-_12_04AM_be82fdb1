@@ -1,0 +1,3844 @@
+# Globe — Energy Orb — Complete source
+
+Component: `GlobeCollection`
+Variant: **Energy Orb** (`energy-orb`)
+Runtime: Raw WebGL + Canvas 2D
+Source revision: `SHA-256 03b1b8e2c440 / 3de7fdcb6239 / 7a88f26e4d8`
+
+## Current configured usage
+
+```tsx
+import { GlobeCollection } from "@designcodeio/threeui";
+import "@designcodeio/threeui/style.css";
+
+export function Scene() {
+  return (
+    <div className="shader-frame">
+      <GlobeCollection
+        variant="energy-orb"
+        speed={1.00}
+        scale={1.00}
+        smokeScale={1.00}
+        smokeStrength={1.00}
+        smokeSpeed={1.00}
+        hue={0}
+        saturation={1.00}
+        glow={1.00}
+        starDensity={1.00}
+        starSpeed={1.00}
+        starSize={1.00}
+        brightness={1.00}
+        opacity={1.00}
+      />
+    </div>
+  );
+}
+```
+
+## Required assets
+
+No binary assets are required.
+
+## Full implementation source
+
+This bundle contains all 6 required text source files. Preserve their paths and contents; none are excerpts.
+
+### `src/shaders/globe/GlobeCollection.tsx`
+
+Role: component · 189 lines · 6900 bytes · SHA-256 `e8db691277c236d1fe2adb53ba3e4a5f51aa697aa625e1bdf9b09adbf03af3b9`
+
+```tsx
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+
+import type { EnergyOrbProps } from "../energy-orb/EnergyOrb";
+import networkGlobeSource from "./sources/network-globe.html?raw";
+import tangledConstellationsSource from "./sources/tangled-constellations.html?raw";
+
+export type GlobeVariant = "energy-orb" | "tangled-constellations" | "network-globe";
+
+export type GlobeCanvasProps = {
+  variant: Exclude<GlobeVariant, "energy-orb">;
+  speed?: number;
+  scale?: number;
+  opacity?: number;
+  hue?: number;
+  saturation?: number;
+  brightness?: number;
+  className?: string;
+  style?: CSSProperties;
+};
+
+type EnergyOrbVariantProps = EnergyOrbProps & {
+  variant?: "energy-orb";
+};
+
+export type GlobeCollectionProps = EnergyOrbVariantProps | GlobeCanvasProps;
+
+export const GLOBE_CANVAS_DEFAULTS = {
+  speed: 1,
+  scale: 1,
+  opacity: 1,
+  hue: 0,
+  saturation: 1,
+  brightness: 1,
+} as const;
+
+const SOURCE_BY_VARIANT: Record<GlobeCanvasProps["variant"], string> = {
+  "tangled-constellations": tangledConstellationsSource,
+  "network-globe": networkGlobeSource,
+};
+
+const EnergyOrbVariant = lazy(() =>
+  import("../energy-orb/EnergyOrb").then((module) => ({ default: module.EnergyOrb })),
+);
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function buildGlobeDocument(variant: GlobeCanvasProps["variant"]) {
+  const focusStyles = `<style data-globe-collection-focus>
+:root { --globe-collection-scale: 1; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+canvas { transform: scale(var(--globe-collection-scale)); transform-origin: 50% 50%; }
+</style>`;
+  const controls = `<script data-globe-collection-controls>
+(function () {
+  var nativeFrame = window.requestAnimationFrame.bind(window);
+  var clock = { real: null, virtual: null };
+  var controls = window.__GLOBE_COLLECTION_CONTROLS = { speed: 1, scale: 1, paused: false };
+  window.__GLOBE_COLLECTION_NOW = function () {
+    return clock.virtual === null ? performance.now() : clock.virtual;
+  };
+  window.requestAnimationFrame = function (callback) {
+    function tick(realTime) {
+      if (clock.real === null) {
+        clock.real = realTime;
+        clock.virtual = realTime;
+      } else {
+        if (!controls.paused) clock.virtual += (realTime - clock.real) * controls.speed;
+        clock.real = realTime;
+      }
+      if (controls.paused) return nativeFrame(tick);
+      callback(clock.virtual);
+    }
+    return nativeFrame(tick);
+  };
+  window.addEventListener('message', function (event) {
+    if (!event.data || event.data.type !== 'globe-collection-controls') return;
+    var next = event.data.controls || {};
+    if (Number.isFinite(next.speed)) controls.speed = Math.max(0, Math.min(3, next.speed));
+    if (Number.isFinite(next.scale)) controls.scale = Math.max(0.65, Math.min(1.35, next.scale));
+    controls.paused = Boolean(next.paused);
+    document.documentElement.style.setProperty('--globe-collection-scale', String(controls.scale));
+    window.dispatchEvent(new Event('resize'));
+  });
+})();
+</script>`;
+
+  const adaptedSource = SOURCE_BY_VARIANT[variant]
+    .replaceAll("performance.now()", "window.__GLOBE_COLLECTION_NOW()");
+
+  return adaptedSource
+    .replace(/<script[^>]+cloudflareinsights\.com[^>]*><\/script>/gi, "")
+    .replace("</head>", `${focusStyles}${controls}</head>`);
+}
+
+function GlobeCanvasScene({
+  variant,
+  speed = GLOBE_CANVAS_DEFAULTS.speed,
+  scale = GLOBE_CANVAS_DEFAULTS.scale,
+  opacity = GLOBE_CANVAS_DEFAULTS.opacity,
+  hue = GLOBE_CANVAS_DEFAULTS.hue,
+  saturation = GLOBE_CANVAS_DEFAULTS.saturation,
+  brightness = GLOBE_CANVAS_DEFAULTS.brightness,
+  className = "",
+  style,
+}: GlobeCanvasProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [hostVisible, setHostVisible] = useState(true);
+  const [documentVisible, setDocumentVisible] = useState(() => typeof document === "undefined" || !document.hidden);
+  const safeSpeed = clamp(speed, 0, 3);
+  const safeScale = clamp(scale, 0.65, 1.35);
+  const paused = !hostVisible || !documentVisible || safeSpeed === 0;
+  const source = useMemo(() => buildGlobeDocument(variant), [variant]);
+
+  const postControls = useCallback(() => {
+    iframeRef.current?.contentWindow?.postMessage({
+      type: "globe-collection-controls",
+      controls: { speed: safeSpeed, scale: safeScale, paused },
+    }, "*");
+  }, [paused, safeScale, safeSpeed]);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(([entry]) => setHostVisible(entry?.isIntersecting ?? true));
+    observer.observe(iframe);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const update = () => setDocumentVisible(!document.hidden);
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+
+  useEffect(() => {
+    postControls();
+  }, [postControls, source]);
+
+  const isTangled = variant === "tangled-constellations";
+  return (
+    <div
+      className={`threeui-background globe-collection globe-collection--${variant}${className ? ` ${className}` : ""}`}
+      style={{ background: isTangled ? "#131313" : "#272727", pointerEvents: "auto", ...style }}
+    >
+      <iframe
+        ref={iframeRef}
+        title={isTangled ? "Interactive tangled constellations globe" : "Interactive network globe"}
+        srcDoc={source}
+        sandbox="allow-scripts"
+        onLoad={postControls}
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "block",
+          width: "100%",
+          height: "100%",
+          border: 0,
+          background: isTangled ? "#131313" : "#272727",
+          opacity: clamp(opacity, 0.05, 1),
+          filter: `hue-rotate(${clamp(hue, -180, 180)}deg) saturate(${clamp(saturation, 0, 2)}) brightness(${clamp(brightness, 0.35, 1.65)})`,
+        }}
+      />
+    </div>
+  );
+}
+
+export function GlobeCollection(props: GlobeCollectionProps) {
+  if (props.variant === "tangled-constellations" || props.variant === "network-globe") {
+    return <GlobeCanvasScene {...props} />;
+  }
+
+  const { variant: _variant, ...energyOrbProps } = props;
+  return (
+    <Suspense fallback={<div className="threeui-background energy-orb" style={{ background: "#05030e" }} />}>
+      <EnergyOrbVariant {...energyOrbProps} />
+    </Suspense>
+  );
+}
+
+export function TangledConstellations(props: Omit<GlobeCanvasProps, "variant">) {
+  return <GlobeCanvasScene {...props} variant="tangled-constellations" />;
+}
+
+export function NetworkGlobe(props: Omit<GlobeCanvasProps, "variant">) {
+  return <GlobeCanvasScene {...props} variant="network-globe" />;
+}
+```
+
+### `src/shaders/energy-orb/EnergyOrb.tsx`
+
+Role: variant-component · 252 lines · 9715 bytes · SHA-256 `be9ca83c7d158dd1366bd942aa4cc4c084b901d59156d047a601ebd9cca4a903`
+
+```tsx
+import { useEffect, useRef } from "react";
+import { NXA_ENERGY_ORB_CONFIGURABLE_FRAGMENT_SHADER, NXA_ENERGY_ORB_VERTEX_SHADER } from "./energyOrbShaders";
+
+export type EnergyOrbProps = {
+  speed?: number;
+  scale?: number;
+  smokeScale?: number;
+  smokeStrength?: number;
+  smokeSpeed?: number;
+  hue?: number;
+  saturation?: number;
+  glow?: number;
+  starDensity?: number;
+  starSpeed?: number;
+  starSize?: number;
+  brightness?: number;
+  opacity?: number;
+  className?: string;
+};
+
+export const ENERGY_ORB_DEFAULTS = {
+  speed: 1,
+  scale: 1,
+  smokeScale: 1,
+  smokeStrength: 1,
+  smokeSpeed: 1,
+  hue: 0,
+  saturation: 1,
+  glow: 1,
+  starDensity: 1,
+  starSpeed: 1,
+  starSize: 1,
+  brightness: 1,
+  opacity: 1,
+} as const;
+
+type Star = { x: number; y: number; depth: number; phase: number; drift: number; size: number };
+
+function compile(gl: WebGLRenderingContext, type: number, source: string) {
+  const shader = gl.createShader(type);
+  if (!shader) throw new Error("Unable to create energy-orb shader");
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const message = gl.getShaderInfoLog(shader) ?? "Energy orb shader compilation failed";
+    console.error(message);
+    throw new Error(message);
+  }
+  return shader;
+}
+
+function seeded(index: number, salt: number) {
+  return Math.abs(Math.sin(index * 91.173 + salt * 17.719) * 43758.5453) % 1;
+}
+
+function createStars(count: number): Star[] {
+  return Array.from({ length: count }, (_, index) => ({
+    x: seeded(index, 1),
+    y: seeded(index, 2),
+    depth: 0.25 + seeded(index, 3) * 0.75,
+    phase: seeded(index, 4) * Math.PI * 2,
+    drift: 0.35 + seeded(index, 5) * 0.65,
+    size: 0.45 + seeded(index, 6) * 1.15,
+  }));
+}
+
+function fract(value: number) {
+  return value - Math.floor(value);
+}
+
+export function EnergyOrb({ className = "", ...props }: EnergyOrbProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const starCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const optionsRef = useRef({ ...ENERGY_ORB_DEFAULTS, ...props });
+  optionsRef.current = { ...ENERGY_ORB_DEFAULTS, ...props };
+
+  useEffect(() => {
+    const host = hostRef.current;
+    const starCanvas = starCanvasRef.current;
+    const canvas = canvasRef.current;
+    if (!host || !starCanvas || !canvas) return undefined;
+
+    const starContext = starCanvas.getContext("2d", { alpha: true });
+    const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: false, antialias: true });
+    if (!starContext || !gl) return undefined;
+
+    const vertex = compile(gl, gl.VERTEX_SHADER, NXA_ENERGY_ORB_VERTEX_SHADER);
+    const fragment = compile(gl, gl.FRAGMENT_SHADER, NXA_ENERGY_ORB_CONFIGURABLE_FRAGMENT_SHADER);
+    const program = gl.createProgram();
+    if (!program) {
+      gl.deleteShader(vertex);
+      gl.deleteShader(fragment);
+      return undefined;
+    }
+    gl.attachShader(program, vertex);
+    gl.attachShader(program, fragment);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const message = gl.getProgramInfoLog(program) ?? "Energy orb program link failed";
+      console.error(message);
+      throw new Error(message);
+    }
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const position = gl.getAttribLocation(program, "p");
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+    const uniforms = {
+      time: gl.getUniformLocation(program, "uT"),
+      resolution: gl.getUniformLocation(program, "uR"),
+      smokeScale: gl.getUniformLocation(program, "uSmokeScale"),
+      smokeStrength: gl.getUniformLocation(program, "uSmokeStrength"),
+      smokeSpeed: gl.getUniformLocation(program, "uSmokeSpeed"),
+      hue: gl.getUniformLocation(program, "uHue"),
+      saturation: gl.getUniformLocation(program, "uSaturation"),
+      glow: gl.getUniformLocation(program, "uGlow"),
+    };
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.clearColor(0, 0, 0, 0);
+
+    const stars = createStars(180);
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let reducedMotion = motionQuery.matches;
+    let width = 1;
+    let height = 1;
+    let starDpr = 1;
+    let frame = 0;
+    let visible = true;
+    const startedAt = performance.now();
+
+    const resize = () => {
+      const bounds = host.getBoundingClientRect();
+      width = Math.max(1, bounds.width);
+      height = Math.max(1, bounds.height);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const bufferWidth = Math.max(1, Math.round(width * dpr));
+      const bufferHeight = Math.max(1, Math.round(height * dpr));
+      if (canvas.width !== bufferWidth || canvas.height !== bufferHeight) {
+        canvas.width = bufferWidth;
+        canvas.height = bufferHeight;
+      }
+      gl.viewport(0, 0, bufferWidth, bufferHeight);
+      gl.uniform2f(uniforms.resolution, bufferWidth, bufferHeight);
+
+      starDpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const starWidth = Math.max(1, Math.round(width * starDpr));
+      const starHeight = Math.max(1, Math.round(height * starDpr));
+      if (starCanvas.width !== starWidth || starCanvas.height !== starHeight) {
+        starCanvas.width = starWidth;
+        starCanvas.height = starHeight;
+      }
+    };
+
+    const drawStars = (elapsed: number) => {
+      const options = optionsRef.current;
+      starContext.setTransform(1, 0, 0, 1, 0, 0);
+      starContext.clearRect(0, 0, starCanvas.width, starCanvas.height);
+      const density = Math.max(0, options.starDensity);
+      const count = Math.min(stars.length, Math.round((width * height / 4_200) * density));
+      if (!count) return;
+
+      starContext.setTransform(starDpr, 0, 0, starDpr, 0, 0);
+      starContext.globalCompositeOperation = "screen";
+      const particleTime = reducedMotion ? 0 : elapsed * Math.max(0, options.starSpeed);
+      const colorHue = fract((252 + options.hue) / 360) * 360;
+      for (let index = 0; index < count; index += 1) {
+        const star = stars[index];
+        const x = fract(star.x + particleTime * 0.0022 * star.drift) * width;
+        const y = fract(star.y - particleTime * 0.0008 * star.depth + 1) * height;
+        const twinkle = reducedMotion ? 0.78 : 0.58 + Math.sin(particleTime * (0.8 + star.depth) + star.phase) * 0.24;
+        const alpha = Math.max(0.08, twinkle * (0.22 + star.depth * 0.48));
+        const radius = Math.max(0.35, star.size * star.depth * Math.max(0.25, options.starSize));
+        starContext.fillStyle = `hsla(${colorHue}, 84%, ${72 + star.depth * 20}%, ${alpha})`;
+        starContext.beginPath();
+        starContext.arc(x, y, radius, 0, Math.PI * 2);
+        starContext.fill();
+      }
+      starContext.globalCompositeOperation = "source-over";
+    };
+
+    const render = (now: number) => {
+      frame = 0;
+      const options = optionsRef.current;
+      const elapsed = (now - startedAt) * 0.001;
+      drawStars(elapsed);
+      gl.uniform1f(uniforms.time, elapsed * options.speed);
+      gl.uniform1f(uniforms.smokeScale, Math.max(0.01, options.smokeScale));
+      gl.uniform1f(uniforms.smokeStrength, Math.max(0, options.smokeStrength));
+      gl.uniform1f(uniforms.smokeSpeed, Math.max(0, options.smokeSpeed));
+      gl.uniform1f(uniforms.hue, options.hue * Math.PI / 180);
+      gl.uniform1f(uniforms.saturation, Math.max(0, options.saturation));
+      gl.uniform1f(uniforms.glow, Math.max(0, options.glow));
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      if (visible && !document.hidden) frame = requestAnimationFrame(render);
+    };
+
+    const start = () => {
+      if (!frame && visible && !document.hidden) frame = requestAnimationFrame(render);
+    };
+    const stop = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) stop();
+      else start();
+    };
+    const onMotionChange = (event: MediaQueryListEvent) => {
+      reducedMotion = event.matches;
+    };
+
+    const resizeObserver = new ResizeObserver(resize);
+    const intersection = new IntersectionObserver(([entry]) => {
+      visible = entry?.isIntersecting ?? true;
+      if (visible) start();
+      else stop();
+    });
+    resizeObserver.observe(host);
+    intersection.observe(host);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    motionQuery.addEventListener("change", onMotionChange);
+    resize();
+    start();
+
+    return () => {
+      stop();
+      resizeObserver.disconnect();
+      intersection.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      motionQuery.removeEventListener("change", onMotionChange);
+      gl.deleteBuffer(buffer);
+      gl.deleteShader(vertex);
+      gl.deleteShader(fragment);
+      gl.deleteProgram(program);
+    };
+  }, []);
+
+  const options = optionsRef.current;
+  return (
+    <div ref={hostRef} className={`threeui-background energy-orb${className ? ` ${className}` : ""}`} style={{ background: "#05030e" }}>
+      <canvas ref={starCanvasRef} className="energy-orb__stars" aria-hidden="true" style={{ zIndex: 0, pointerEvents: "none" }} />
+      <canvas ref={canvasRef} className="energy-orb__shader" aria-hidden="true" style={{ zIndex: 1, opacity: options.opacity, filter: `brightness(${options.brightness})`, transform: `scale(${options.scale})`, pointerEvents: "none" }} />
+    </div>
+  );
+}
+```
+
+### `src/shaders/energy-orb/energyOrbShaders.ts`
+
+Role: variant-shader-source · 106 lines · 4787 bytes · SHA-256 `03b1b8e2c44042ac1e880003e55016a641329028205c62dcd17e535b99496aec`
+
+```typescript
+export const NXA_ENERGY_ORB_VERTEX_SHADER = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
+
+export const NXA_ENERGY_ORB_FRAGMENT_SHADER = [
+  "precision highp float;",
+  "uniform float uT;uniform vec2 uR;",
+  "float hash(vec3 p){p=fract(p*0.3183099+vec3(0.1,0.2,0.3));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}",
+  "float noise(vec3 x){vec3 i=floor(x);vec3 f=fract(x);f=f*f*(3.0-2.0*f);",
+  " return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),",
+  " mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}",
+  "float fbm(vec3 p){float v=0.0;float a=0.5;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.03+vec3(1.7);a*=0.5;}return v;}",
+  "void main(){",
+  " vec2 uv=(gl_FragCoord.xy-0.5*uR)/min(uR.x,uR.y);",
+  " float r=length(uv);",
+  " float R=0.31;",
+  " vec3 col=vec3(0.0);float alpha=0.0;",
+  " if(r<R){",
+  "   float z=sqrt(R*R-r*r);",
+  "   vec3 n=normalize(vec3(uv,z));",
+  "   float ca=uT*0.15;",
+  "   mat3 rot=mat3(cos(ca),0.,sin(ca),0.,1.,0.,-sin(ca),0.,cos(ca));",
+  "   vec3 sp=rot*n;",
+  "   float f1=fbm(sp*2.6+vec3(0.0,uT*0.12,0.0));",
+  "   float f2=fbm(sp*4.5-vec3(uT*0.08,0.0,uT*0.05)+f1*1.8);",
+  "   float veil=smoothstep(0.35,0.75,f2);",
+  "   vec3 deep=vec3(0.04,0.02,0.12);",
+  "   vec3 mid=vec3(0.22,0.16,0.55);",
+  "   vec3 bright=vec3(0.62,0.60,0.98);",
+  "   col=mix(deep,mid,f1*1.2);",
+  "   col=mix(col,bright,veil*0.65);",
+  "   float fres=pow(1.0-z/R,2.2);",
+  "   col+=vec3(0.55,0.55,1.0)*fres*1.1;",
+  "   float top=pow(max(dot(n,normalize(vec3(0.0,0.7,0.7))),0.0),3.0);",
+  "   col+=vec3(0.45,0.42,0.9)*top*0.35;",
+  "   alpha=1.0;",
+  " }",
+  " float glow=exp(-(r-R)*14.0);",
+  " if(r>=R){",
+  "   glow=clamp(glow,0.0,1.0);",
+  "   col=vec3(0.55,0.52,1.0)*glow*0.8;",
+  "   alpha=glow*0.85;",
+  " } else {",
+  "   float rim=smoothstep(R-0.03,R,r);",
+  "   col+=vec3(0.6,0.58,1.0)*rim*0.6;",
+  " }",
+  " gl_FragColor=vec4(col,alpha);",
+  "}",
+].join("\n");
+
+// The canonical source above remains byte-for-byte intact for provenance checks.
+// This host variant replaces only source constants with uniforms whose defaults
+// reproduce the authored rendering exactly.
+export const NXA_ENERGY_ORB_CONFIGURABLE_FRAGMENT_SHADER = [
+  "precision highp float;",
+  "uniform float uT;uniform vec2 uR;",
+  "uniform float uSmokeScale;uniform float uSmokeStrength;uniform float uSmokeSpeed;",
+  "uniform float uHue;uniform float uSaturation;uniform float uGlow;",
+  "float hash(vec3 p){p=fract(p*0.3183099+vec3(0.1,0.2,0.3));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}",
+  "float noise(vec3 x){vec3 i=floor(x);vec3 f=fract(x);f=f*f*(3.0-2.0*f);",
+  " return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),",
+  " mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}",
+  "float fbm(vec3 p){float v=0.0;float a=0.5;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.03+vec3(1.7);a*=0.5;}return v;}",
+  "vec3 gradeColor(vec3 color){",
+  " float luminance=dot(color,vec3(0.2126,0.7152,0.0722));",
+  " color=mix(vec3(luminance),color,uSaturation);",
+  " vec3 axis=normalize(vec3(1.0));",
+  " return max(vec3(0.0),color*cos(uHue)+cross(axis,color)*sin(uHue)+axis*dot(axis,color)*(1.0-cos(uHue)));",
+  "}",
+  "void main(){",
+  " vec2 uv=(gl_FragCoord.xy-0.5*uR)/min(uR.x,uR.y);",
+  " float r=length(uv);",
+  " float R=0.31;",
+  " vec3 col=vec3(0.0);float alpha=0.0;",
+  " if(r<R){",
+  "   float z=sqrt(R*R-r*r);",
+  "   vec3 n=normalize(vec3(uv,z));",
+  "   float ca=uT*0.15;",
+  "   mat3 rot=mat3(cos(ca),0.,sin(ca),0.,1.,0.,-sin(ca),0.,cos(ca));",
+  "   vec3 sp=rot*n;",
+  "   float smokeTime=uT*uSmokeSpeed;",
+  "   float f1=fbm(sp*(2.6*uSmokeScale)+vec3(0.0,smokeTime*0.12,0.0));",
+  "   float f2=fbm(sp*(4.5*uSmokeScale)-vec3(smokeTime*0.08,0.0,smokeTime*0.05)+f1*1.8);",
+  "   float veil=smoothstep(0.35,0.75,f2);",
+  "   vec3 deep=vec3(0.04,0.02,0.12);",
+  "   vec3 mid=vec3(0.22,0.16,0.55);",
+  "   vec3 bright=vec3(0.62,0.60,0.98);",
+  "   col=mix(deep,mid,f1*1.2);",
+  "   col=mix(col,bright,clamp(veil*0.65*uSmokeStrength,0.0,1.0));",
+  "   float fres=pow(1.0-z/R,2.2);",
+  "   col+=vec3(0.55,0.55,1.0)*fres*1.1*uGlow;",
+  "   float top=pow(max(dot(n,normalize(vec3(0.0,0.7,0.7))),0.0),3.0);",
+  "   col+=vec3(0.45,0.42,0.9)*top*0.35*uGlow;",
+  "   alpha=1.0;",
+  " }",
+  " float glow=exp(-(r-R)*14.0);",
+  " if(r>=R){",
+  "   glow=clamp(glow,0.0,1.0);",
+  "   col=vec3(0.55,0.52,1.0)*glow*0.8*uGlow;",
+  "   alpha=glow*0.85;",
+  " } else {",
+  "   float rim=smoothstep(R-0.03,R,r);",
+  "   col+=vec3(0.6,0.58,1.0)*rim*0.6*uGlow;",
+  " }",
+  " col=gradeColor(col);",
+  " gl_FragColor=vec4(col,alpha);",
+  "}",
+].join("\n");
+```
+
+### `src/shaders/globe/sources/tangled-constellations.html`
+
+Role: variant-source · 635 lines · 20606 bytes · SHA-256 `3de7fdcb62399863ca942c6a502edeeb68b80bcfb8b9f60cd580b56bba94d009`
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tangled Constellations</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    background:#131313;
+    display:grid;
+    place-items:center;
+    overflow:hidden;
+  }
+  canvas{display:block;cursor:grab;touch-action:none;}
+  canvas.dragging{cursor:grabbing;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+/* =========================================================
+   TANGLED CONSTELLATIONS — globe edition
+   chains of clean monotone glyphs wandering a 3D sphere,
+   colliding with each other and with the stars pinned to it.
+   Drag to spin (with inertia); the cursor is a solid collider
+   that shoves any shape it touches.
+   ========================================================= */
+
+const params = new URLSearchParams(location.search);
+const SEED  = parseInt(params.get('seed') || '11', 10);
+const FREEZE_T = params.get('t') !== null ? parseFloat(params.get('t')) : null; // fast-forward & freeze (verification)
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- rng + noise ---------- */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rng = mulberry32(SEED);
+
+function hash1(i, seed){
+  let h = (i * 374761393 + seed * 668265263) | 0;
+  h = Math.imul(h ^ h >>> 13, 1274126177);
+  return (((h ^ h >>> 16) >>> 0) / 4294967296);
+}
+function noise1(seed, t){
+  const i = Math.floor(t), f = t - i;
+  const u = f*f*(3-2*f);
+  return hash1(i, seed)*(1-u) + hash1(i+1, seed)*u;
+}
+
+const TAU = Math.PI * 2;
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp = (a,b,t)=>a+(b-a)*t;
+
+/* ---------- canvas ---------- */
+const S = 1080;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+let view = S;
+function resize(){
+  view = Math.min(innerWidth, innerHeight);
+  canvas.width = view * DPR;
+  canvas.height = view * DPR;
+  canvas.style.width = view + 'px';
+  canvas.style.height = view + 'px';
+}
+resize();
+addEventListener('resize', ()=>{
+  resize();
+  if(FREEZE_T !== null || REDUCED) draw();
+});
+
+/* ---------- palette: monotone ---------- */
+const TONE = '#EDEBE6';
+const BG = '#131313';
+
+/* ---------- globe ---------- */
+const CENTER = S/2;
+const R = S * .40;                 // sphere radius (world units)
+const FOV = R * 3.4;               // camera distance for mild perspective
+
+/* nodes live on the sphere surface; positions are 3D, length R */
+function reproject(n){
+  const d = Math.hypot(n.x, n.y, n.z) || 1;
+  const s = R / d;
+  n.x *= s; n.y *= s; n.z *= s;
+}
+
+/* ---------- population ---------- */
+const chains = [];
+const nodes = [];
+let seedCounter = 1;
+
+function makeNode(x, y, z){
+  const gr = rng();
+  let glyph;
+  if(gr < .42)      glyph = {type:'dot',    r: .9 + rng()*1.4};
+  else if(gr < .55) glyph = {type:'circle', r: 2.5 + rng()*3, dot: rng() < .3};
+  else if(gr < .72) glyph = {type:'circle', r: 6 + Math.pow(rng(),1.8)*30 + (rng()<.06 ? 16 : 0),
+                             dot: rng() < .6, dbl: rng() < .18};
+  else if(gr < .84) glyph = {type:'square', h: 5 + Math.pow(rng(),1.6)*26,
+                             rot: (rng()<.25 ? Math.PI/4 : (rng()-.5)*.9), dot: rng() < .4};
+  else if(gr < .96) glyph = {type:'cross',  a1: 10 + rng()*42, a2: 8 + rng()*36,
+                             rot: rng()*TAU, skew: (rng()-.5)*.7};
+  else              glyph = {type:'square', h: 3.5 + rng()*3.5, rot: Math.PI/4, dot:false};
+  let cr;
+  if(glyph.type === 'dot')         cr = 2.4;
+  else if(glyph.type === 'circle') cr = glyph.r + 1.5;
+  else if(glyph.type === 'square') cr = glyph.h * 1.25;
+  else                             cr = clamp(Math.max(glyph.a1, glyph.a2) * .3, 4, 12);
+  const n = {
+    x, y, z,
+    seed: seedCounter++,
+    glyph,
+    cr: Math.min(cr, 40),
+  };
+  reproject(n);
+  return n;
+}
+
+/* random unit vector (uniform on sphere) */
+function randDir(){
+  const z = rng()*2 - 1;
+  const a = rng()*TAU;
+  const s = Math.sqrt(1 - z*z);
+  return {x: Math.cos(a)*s, y: z, z: Math.sin(a)*s};
+}
+/* random tangent direction at point p (unit) */
+function randTangent(p){
+  const w = randDir();
+  const d = w.x*p.x + w.y*p.y + w.z*p.z;
+  const t = {x: w.x - d*p.x, y: w.y - d*p.y, z: w.z - d*p.z};
+  const m = Math.hypot(t.x, t.y, t.z) || 1;
+  return {x: t.x/m, y: t.y/m, z: t.z/m};
+}
+
+function buildPopulation(){
+  const TOTAL_RING_CHAINS = 112;
+  const INNER_CHAINS = 34;
+  let arc = rng()*TAU;
+  for(let ci=0; ci<TOTAL_RING_CHAINS + INNER_CHAINS; ci++){
+    const inner = ci >= TOTAL_RING_CHAINS;
+    const len = inner && rng() < .4 ? 1 : 2 + Math.floor(Math.pow(rng(), 1.3)*5.5);
+    const restLen = 26 + rng()*20;
+    const chain = {nodes: [], restLen, seed: seedCounter++, headFreq: rng() < .45 ? .07 : .16};
+    if(inner){
+      /* scattered anywhere on the sphere, short walks along the surface */
+      let p = randDir();
+      let px = p.x*R, py = p.y*R, pz = p.z*R;
+      for(let i=0;i<len;i++){
+        chain.nodes.push(makeNode(px, py, pz));
+        const t = randTangent({x:px/R, y:py/R, z:pz/R});
+        px += t.x*restLen*.9; py += t.y*restLen*.9; pz += t.z*restLen*.9;
+      }
+    }else{
+      /* laid along the equator great circle, compressed, slight scatter */
+      for(let i=0;i<len;i++){
+        const jx = (rng()-.5)*36, jy = (rng()-.5)*36;
+        chain.nodes.push(makeNode(
+          Math.cos(arc)*R,
+          jy,
+          Math.sin(arc)*R
+        ));
+        /* nudge sideways off the exact circle */
+        const n = chain.nodes[chain.nodes.length-1];
+        n.x += -Math.sin(arc)*jx; n.z += Math.cos(arc)*jx;
+        reproject(n);
+        arc += (restLen*.4)/R;
+      }
+      arc += (rng()*10)/R;
+    }
+    chain.nodes.forEach(n => nodes.push(n));
+    chains.push(chain);
+  }
+  for(const n of nodes){
+    const d = Math.hypot(n.x, n.y, n.z);
+    n.homeX = n.x/d; n.homeY = n.y/d; n.homeZ = n.z/d;   // unit home direction
+  }
+}
+buildPopulation();
+
+const adjacent = new Set();
+for(const chain of chains){
+  for(let i=1;i<chain.nodes.length;i++){
+    adjacent.add(chain.nodes[i-1].seed + '_' + chain.nodes[i].seed);
+    adjacent.add(chain.nodes[i].seed + '_' + chain.nodes[i-1].seed);
+  }
+}
+
+/* ---------- stars: pinned to the globe, solid obstacles ---------- */
+const stars = [];
+const GRID_CELL = 84;
+const starGrid = new Map();
+function cellKey(x, y, z){
+  return ((x/GRID_CELL)|0) + ',' + ((y/GRID_CELL)|0) + ',' + ((z/GRID_CELL)|0);
+}
+(function buildStars(){
+  for(let i=0;i<170;i++){
+    const big = rng() < .12;
+    const d = randDir();
+    const st = {
+      x: d.x*R, y: d.y*R, z: d.z*R,
+      r: big ? 1.8 + rng()*1.4 : .5 + rng()*1.1,
+      seed: seedCounter++,
+      sparkle: big && rng() < .6,
+    };
+    st.cr = st.r + 6;
+    stars.push(st);
+    const key = cellKey(st.x, st.y, st.z);
+    if(!starGrid.has(key)) starGrid.set(key, []);
+    starGrid.get(key).push(st);
+  }
+})();
+
+/* faint fixed dust behind the globe */
+const dust = [];
+for(let i=0;i<55;i++){
+  dust.push({x: rng()*S, y: rng()*S, r: .4 + rng()*.7, a: .05 + rng()*.09});
+}
+
+/* ---------- mouse: drag to spin, hover to stir ---------- */
+const BASE_TILT = -.35, AUTO_SPIN = .10;
+let yaw = 0, pitch = BASE_TILT;
+let velYaw = AUTO_SPIN, velPitch = 0;
+let dragging = false, dragDX = 0, dragDY = 0;
+let lastPX = 0, lastPY = 0;
+const pointer = {x: -1e6, y: -1e6, active: false};
+
+function toLogical(e){
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (S / rect.width),
+    y: (e.clientY - rect.top) * (S / rect.height),
+  };
+}
+canvas.addEventListener('pointerdown', e=>{
+  dragging = true;
+  canvas.classList.add('dragging');
+  canvas.setPointerCapture(e.pointerId);
+  lastPX = e.clientX; lastPY = e.clientY;
+});
+addEventListener('pointermove', e=>{
+  const p = toLogical(e);
+  pointer.x = p.x; pointer.y = p.y; pointer.active = true;
+  if(dragging){
+    dragDX += e.clientX - lastPX;
+    dragDY += e.clientY - lastPY;
+    lastPX = e.clientX; lastPY = e.clientY;
+  }
+});
+addEventListener('pointerup', ()=>{
+  dragging = false;
+  canvas.classList.remove('dragging');
+});
+canvas.addEventListener('pointerleave', ()=>{ pointer.active = false; });
+
+/* rotation matrix (globe-local -> view): tilt about X after spin about Y */
+let M = [1,0,0, 0,1,0, 0,0,1];
+function updateMatrix(){
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const cx = Math.cos(pitch), sx = Math.sin(pitch);
+  /* Rx(pitch) * Ry(yaw) */
+  M = [
+    cy,        0,       sy,
+    sx*sy,     cx,     -sx*cy,
+    -cx*sy,    sx,      cx*cy,
+  ];
+}
+function viewOf(n){
+  return {
+    x: M[0]*n.x + M[1]*n.y + M[2]*n.z,
+    y: M[3]*n.x + M[4]*n.y + M[5]*n.z,
+    z: M[6]*n.x + M[7]*n.y + M[8]*n.z,
+  };
+}
+/* screen point -> globe-local surface point via ray-sphere intersection,
+   null if the cursor ray misses the globe. Exact under perspective, so
+   contact happens precisely where the cursor visually touches a shape. */
+function unproject(sx, sy){
+  const px = sx - CENTER, py = sy - CENTER;
+  const A = px*px + py*py + FOV*FOV;
+  const Bq = -2*FOV*FOV;
+  const Cq = FOV*FOV - R*R;
+  const disc = Bq*Bq - 4*A*Cq;
+  if(disc < 0) return null;
+  const t = (-Bq - Math.sqrt(disc)) / (2*A);   // near (front) intersection
+  const vx = t*px, vy = t*py, vz = FOV*(1-t);
+  /* inverse rotation = transpose */
+  return {
+    x: M[0]*vx + M[3]*vy + M[6]*vz,
+    y: M[1]*vx + M[4]*vy + M[7]*vz,
+    z: M[2]*vx + M[5]*vy + M[8]*vz,
+  };
+}
+
+/* ---------- physics ---------- */
+let simT = 0;
+function attractorPos(t){
+  const th = (noise1(9001, t*.045 + 3.7)*4 - 2) * Math.PI;
+  const ph = (noise1(9007, t*.045 + 8.2) - .5) * Math.PI * .75;
+  return {
+    x: Math.cos(ph)*Math.cos(th)*R,
+    y: Math.sin(ph)*R,
+    z: Math.cos(ph)*Math.sin(th)*R,
+  };
+}
+
+const CYCLE = 38, REFORM_AT = 32;
+const CURSOR_R = 12;               // the cursor's collision radius on the surface
+function step(dt){
+  simT += dt;
+  const tc = simT % CYCLE;
+  let reform = 0;
+  if(tc > REFORM_AT){
+    const f = (tc - REFORM_AT) / (CYCLE - REFORM_AT);
+    reform = f < .8 ? f/.8 : (1-f)/.2;
+    reform = reform*reform*(3-2*reform);
+  }
+  const att = attractorPos(simT);
+  const stir = (FREEZE_T === null && pointer.active && !dragging) ? unproject(pointer.x, pointer.y) : null;
+
+  for(const chain of chains){
+    const head = chain.nodes[0];
+
+    /* head: smooth noise wander along the surface */
+    const t = simT * chain.headFreq;
+    const wx = noise1(head.seed, t) - .5,
+          wy = noise1(head.seed + 91, t) - .5,
+          wz = noise1(head.seed + 182, t) - .5;
+    const rd = (wx*head.x + wy*head.y + wz*head.z) / R;
+    let tx = wx - rd*head.x/R, ty = wy - rd*head.y/R, tz = wz - rd*head.z/R;
+    const tm = Math.hypot(tx, ty, tz);
+    if(tm > 1e-4){
+      const speed = 26 + noise1(head.seed + 500, simT*.3) * 36;
+      head.x += tx/tm * speed * dt;
+      head.y += ty/tm * speed * dt;
+      head.z += tz/tm * speed * dt;
+    }
+
+    for(let i=1;i<chain.nodes.length;i++){
+      const n = chain.nodes[i], p = chain.nodes[i-1];
+      let dx = n.x - p.x, dy = n.y - p.y, dz = n.z - p.z;
+      const d = Math.hypot(dx, dy, dz) || 1;
+      const k = Math.min(1, dt*5);
+      n.x += (p.x + dx/d * chain.restLen - n.x) * k;
+      n.y += (p.y + dy/d * chain.restLen - n.y) * k;
+      n.z += (p.z + dz/d * chain.restLen - n.z) * k;
+      n.x += (noise1(n.seed+31, simT*.3) - .5) * 26 * dt;
+      n.y += (noise1(n.seed+77, simT*.3) - .5) * 26 * dt;
+      n.z += (noise1(n.seed+123, simT*.3) - .5) * 26 * dt;
+    }
+
+    for(const n of chain.nodes){
+      /* attractor pull (chord distance), fading at its center */
+      let ax = att.x - n.x, ay = att.y - n.y, az = att.z - n.z;
+      const ad = Math.hypot(ax, ay, az);
+      if(ad < 380 && ad > 1){
+        const pull = 26 * (1 - ad/380) * clamp(ad/120, 0, 1) * (1 - reform);
+        n.x += ax/ad * pull * dt;
+        n.y += ay/ad * pull * dt;
+        n.z += az/ad * pull * dt;
+      }
+      /* the cursor is a solid collider: shapes it touches get shoved out */
+      if(stir){
+        let sx = n.x - stir.x, sy = n.y - stir.y, sz = n.z - stir.z;
+        const sd = Math.hypot(sx, sy, sz);
+        const minD = n.cr + CURSOR_R;
+        if(sd < minD && sd > .5){
+          const push = (minD - sd) * .9;
+          n.x += sx/sd * push;
+          n.y += sy/sd * push;
+          n.z += sz/sd * push;
+        }
+      }
+      /* cyclical reform: drift home to the equator ring, then release */
+      if(reform > 0){
+        n.x += (n.homeX*R - n.x) * reform * dt * 3;
+        n.y += (n.homeY*R - n.y) * reform * dt * 3;
+        n.z += (n.homeZ*R - n.z) * reform * dt * 3;
+      }
+    }
+  }
+
+  frameGrid = makeGrid();
+  for(let it=0; it<4; it++) resolveCollisions();
+  for(const n of nodes) reproject(n);
+}
+
+/* ---------- collisions (3D chord space) ---------- */
+let frameGrid = null;
+function makeGrid(){
+  const grid = new Map();
+  nodes.forEach((n, i)=>{
+    const key = cellKey(n.x, n.y, n.z);
+    if(!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(i);
+  });
+  return grid;
+}
+
+function resolveCollisions(){
+  nodes.forEach((n, i)=>{
+    const gx = (n.x/GRID_CELL)|0, gy = (n.y/GRID_CELL)|0, gz = (n.z/GRID_CELL)|0;
+    for(let ox=-1;ox<=1;ox++) for(let oy=-1;oy<=1;oy++) for(let oz=-1;oz<=1;oz++){
+      const bucket = frameGrid.get((gx+ox)+','+(gy+oy)+','+(gz+oz));
+      if(!bucket) continue;
+      for(const j of bucket){
+        if(j <= i) continue;
+        const m = nodes[j];
+        if(adjacent.has(n.seed + '_' + m.seed)) continue;
+        const minD = n.cr + m.cr;
+        let dx = m.x - n.x, dy = m.y - n.y, dz = m.z - n.z;
+        const d2 = dx*dx + dy*dy + dz*dz;
+        if(d2 >= minD*minD || d2 === 0) continue;
+        const d = Math.sqrt(d2);
+        const push = (minD - d) * .5 * .45;
+        dx /= d; dy /= d; dz /= d;
+        n.x -= dx * push; n.y -= dy * push; n.z -= dz * push;
+        m.x += dx * push; m.y += dy * push; m.z += dz * push;
+      }
+      const sBucket = starGrid.get((gx+ox)+','+(gy+oy)+','+(gz+oz));
+      if(!sBucket) continue;
+      for(const st of sBucket){
+        const minD = n.cr + st.cr;
+        let dx = n.x - st.x, dy = n.y - st.y, dz = n.z - st.z;
+        const d2 = dx*dx + dy*dy + dz*dz;
+        if(d2 >= minD*minD || d2 === 0) continue;
+        const d = Math.sqrt(d2);
+        const push = (minD - d) * .9;
+        n.x += dx/d * push;
+        n.y += dy/d * push;
+        n.z += dz/d * push;
+      }
+    }
+  });
+}
+
+/* ---------- links ---------- */
+const LINK_D = 58;
+function findLinks(){
+  if(!frameGrid) frameGrid = makeGrid();
+  const links = [];
+  nodes.forEach((n, i)=>{
+    const gx = (n.x/GRID_CELL)|0, gy = (n.y/GRID_CELL)|0, gz = (n.z/GRID_CELL)|0;
+    for(let ox=-1;ox<=1;ox++) for(let oy=-1;oy<=1;oy++) for(let oz=-1;oz<=1;oz++){
+      const bucket = frameGrid.get((gx+ox)+','+(gy+oy)+','+(gz+oz));
+      if(!bucket) continue;
+      for(const j of bucket){
+        if(j <= i) continue;
+        const m = nodes[j];
+        const dx = n.x-m.x, dy = n.y-m.y, dz = n.z-m.z;
+        if(dx*dx + dy*dy + dz*dz < LINK_D*LINK_D){
+          links.push([i, j]);
+        }
+      }
+    }
+  });
+  return links;
+}
+
+/* ---------- rendering ---------- */
+const DEPTH_A = [.15, .32, .58, 1];        // back -> front alpha
+const idxOf = new Map();
+nodes.forEach((n, i)=>idxOf.set(n.seed, i));
+function bucketOf(vz){
+  return clamp(((vz/R + 1) * 2) | 0, 0, 3);
+}
+
+function draw(){
+  updateMatrix();
+  ctx.setTransform(DPR*view/S, 0, 0, DPR*view/S, 0, 0);
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, S, S);
+  ctx.lineWidth = 1.15;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.fillStyle = TONE;
+  ctx.strokeStyle = TONE;
+
+  /* fixed dust, far behind the globe */
+  for(const d of dust){
+    ctx.globalAlpha = d.a;
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.r, 0, TAU);
+    ctx.fill();
+  }
+
+  /* project all nodes once */
+  const proj = new Array(nodes.length);
+  for(let i=0;i<nodes.length;i++){
+    const v = viewOf(nodes[i]);
+    const ps = FOV / (FOV - v.z);
+    proj[i] = {x: CENTER + v.x*ps, y: CENTER + v.y*ps, s: ps, b: bucketOf(v.z)};
+  }
+
+  /* depth-bucketed batches: [dim links, rope edges, glyph strokes, dot fills] */
+  const B = [0,1,2,3].map(()=>({dim: new Path2D(), edge: new Path2D(), glyph: new Path2D(), dot: new Path2D()}));
+
+  for(const [i, j] of findLinks()){
+    const a = nodes[i], b = nodes[j];
+    if(adjacent.has(a.seed + '_' + b.seed)) continue;
+    const pa = proj[i], pb = proj[j];
+    const path = B[Math.min(pa.b, pb.b)].dim;
+    path.moveTo(pa.x, pa.y);
+    path.lineTo(pb.x, pb.y);
+  }
+
+  for(const chain of chains){
+    for(let i=1;i<chain.nodes.length;i++){
+      const pa = proj[idxOf.get(chain.nodes[i-1].seed)];
+      const pb = proj[idxOf.get(chain.nodes[i].seed)];
+      const path = B[Math.min(pa.b, pb.b)].edge;
+      path.moveTo(pa.x, pa.y);
+      path.lineTo(pb.x, pb.y);
+    }
+  }
+
+  for(let i=0;i<nodes.length;i++){
+    const n = nodes[i], g = n.glyph, p = proj[i];
+    const gp = B[p.b].glyph, dp = B[p.b].dot;
+    const sc = p.s;
+    if(g.type === 'dot'){
+      dp.moveTo(p.x + g.r*sc, p.y);
+      dp.arc(p.x, p.y, g.r*sc, 0, TAU);
+    }else if(g.type === 'circle'){
+      gp.moveTo(p.x + g.r*sc, p.y);
+      gp.arc(p.x, p.y, g.r*sc, 0, TAU);
+      if(g.dbl){
+        const r2 = Math.max(g.r - 3, g.r*.72) * sc;
+        gp.moveTo(p.x + r2, p.y);
+        gp.arc(p.x, p.y, r2, 0, TAU);
+      }
+      if(g.dot){ dp.moveTo(p.x + 1.1*sc, p.y); dp.arc(p.x, p.y, 1.1*sc, 0, TAU); }
+    }else if(g.type === 'square'){
+      for(let k=0;k<=4;k++){
+        const a = g.rot + Math.PI/4 + k*Math.PI/2;
+        const x = p.x + Math.cos(a)*g.h*Math.SQRT2*sc, y = p.y + Math.sin(a)*g.h*Math.SQRT2*sc;
+        if(k===0) gp.moveTo(x, y); else gp.lineTo(x, y);
+      }
+      if(g.dot){ dp.moveTo(p.x + 1.1*sc, p.y); dp.arc(p.x, p.y, 1.1*sc, 0, TAU); }
+    }else if(g.type === 'cross'){
+      const r1 = g.rot, r2 = g.rot + Math.PI/2 + g.skew;
+      const o1 = (hash1(n.seed, 5) - .5) * g.a1 * .5;
+      const o2 = (hash1(n.seed, 6) - .5) * g.a2 * .5;
+      gp.moveTo(p.x - Math.cos(r1)*(g.a1 - o1)*sc, p.y - Math.sin(r1)*(g.a1 - o1)*sc);
+      gp.lineTo(p.x + Math.cos(r1)*(g.a1 + o1)*sc, p.y + Math.sin(r1)*(g.a1 + o1)*sc);
+      gp.moveTo(p.x - Math.cos(r2)*(g.a2 - o2)*sc, p.y - Math.sin(r2)*(g.a2 - o2)*sc);
+      gp.lineTo(p.x + Math.cos(r2)*(g.a2 + o2)*sc, p.y + Math.sin(r2)*(g.a2 + o2)*sc);
+    }
+  }
+
+  /* stars: individual (per-star twinkle x depth) */
+  for(const st of stars){
+    const v = viewOf(st);
+    const ps = FOV / (FOV - v.z);
+    const sx = CENTER + v.x*ps, sy = CENTER + v.y*ps;
+    const depth = DEPTH_A[bucketOf(v.z)];
+    ctx.globalAlpha = (.10 + .38 * noise1(st.seed, simT*.35)) * depth;
+    ctx.beginPath();
+    ctx.arc(sx, sy, st.r*ps, 0, TAU);
+    ctx.fill();
+    if(st.sparkle){
+      const a = st.r*3.4*ps;
+      ctx.beginPath();
+      ctx.moveTo(sx - a, sy); ctx.lineTo(sx + a, sy);
+      ctx.moveTo(sx, sy - a); ctx.lineTo(sx, sy + a);
+      ctx.stroke();
+    }
+  }
+
+  /* back-to-front strokes */
+  for(let b=0;b<4;b++){
+    const d = DEPTH_A[b];
+    ctx.globalAlpha = .22 * d;
+    ctx.stroke(B[b].dim);
+    ctx.globalAlpha = .5 * d;
+    ctx.stroke(B[b].edge);
+    ctx.globalAlpha = .92 * d;
+    ctx.stroke(B[b].glyph);
+    ctx.globalAlpha = .9 * d;
+    ctx.fill(B[b].dot);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- run ---------- */
+function advanceCamera(dt){
+  if(dragging){
+    const dy = dragDX * .004, dp = dragDY * .004;
+    yaw += dy; pitch = clamp(pitch + dp, -1.2, 1.2);
+    velYaw = lerp(velYaw, dy/Math.max(dt, 1e-3), .35);
+    velPitch = lerp(velPitch, dp/Math.max(dt, 1e-3), .35);
+    dragDX = dragDY = 0;
+  }else{
+    yaw += velYaw * dt;
+    pitch = clamp(pitch + velPitch * dt, -1.2, 1.2);
+    /* inertia decays; spin settles back to the idle rate */
+    const decay = Math.pow(.32, dt);
+    velYaw = AUTO_SPIN + (velYaw - AUTO_SPIN) * decay;
+    velPitch *= decay;
+  }
+}
+
+if(FREEZE_T !== null){
+  const steps = Math.round(FREEZE_T * 60);
+  for(let i=0;i<steps;i++) step(1/60);
+  yaw = AUTO_SPIN * FREEZE_T;
+  draw();
+}else if(REDUCED){
+  for(let i=0;i<12*60;i++) step(1/60);
+  yaw = AUTO_SPIN * 12;
+  draw();
+}else{
+  let last = performance.now();
+  (function loop(now){
+    const dt = Math.min((now - last)/1000, .05);
+    last = now;
+    advanceCamera(dt);
+    step(dt);
+    draw();
+    requestAnimationFrame(loop);
+  })(performance.now());
+}
+</script>
+</body>
+</html>
+```
+
+### `src/shaders/globe/sources/network-globe.html`
+
+Role: variant-source · 801 lines · 28518 bytes · SHA-256 `7a88f26e4d8dfdc66c75eedb61d8e7136b747b5145c07edf1db9633dcd096405`
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Globe</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    overflow:hidden;
+    background:
+      radial-gradient(34vmax at 5% 112%, rgba(110,215,235,.4) 0%, transparent 100%),
+      radial-gradient(34vmax at 95% 112%, rgba(168,140,250,.4) 0%, transparent 100%),
+      linear-gradient(#272727 0%, #272727 48%, #2A2C44 60%, #383E74 74%, #4A4C9A 87%, #6B62C2 100%);
+  }
+  canvas{display:block;cursor:grab;touch-action:none;}
+  canvas.dragging{cursor:grabbing;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+/* =========================================================
+   NETWORK GLOBE
+   a dotted-continent world on a dusk gradient, slowly spinning,
+   with gradient flight-path arcs leaping between land dots.
+   Arcs that cross each other burst into small sparks.
+   Drag to spin (inertia); hover highlights the nearest node;
+   click a node to launch an arc from it.
+   ========================================================= */
+
+const params = new URLSearchParams(location.search);
+const SEED  = parseInt(params.get('seed') || '7', 10);
+const FREEZE_T = params.get('t') !== null ? parseFloat(params.get('t')) : null;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- rng ---------- */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rng = mulberry32(SEED);
+const arcRng = mulberry32(SEED * 71 + 13);
+
+const TAU = Math.PI * 2;
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp = (a,b,t)=>a+(b-a)*t;
+const easeInOut = t=>t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+
+/* ---------- canvas ---------- */
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const DPR = clampDPR();
+function clampDPR(){
+  const o = parseFloat(new URLSearchParams(location.search).get('dpr') || '0');
+  return o > 0 ? o : Math.min(window.devicePixelRatio || 1, 2);
+}
+let W = 0, H = 0, CX = 0, CY = 0, R = 0, FOV = 0;
+function resize(){
+  W = innerWidth; H = innerHeight;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  CX = W / 2;
+  CY = H * .47;
+  R = Math.min(W, H) * .37;
+  FOV = R * 3.4;
+}
+resize();
+addEventListener('resize', ()=>{
+  resize();
+  if(FREEZE_T !== null || REDUCED) draw();
+});
+
+/* ---------- palette: purple & cyan ---------- */
+const ARC_PURPLE = '#8A4DFF';
+const ARC_CYAN = '#29D8E6';
+const OCEAN_TONE = '#7FA8E0';
+
+/* ---------- mesh: dots sampled on the continents ----------
+   144x72 equirectangular land mask (1 bit per cell), baked from
+   NASA's Blue Marble. Nodes are sampled on land only, so the dot
+   cloud reads as the world's continents. */
+const LAND_W = 144, LAND_H = 72;
+const LAND_HEX = '000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fe03f800000000000000000f003c8030007fffffffe0000000000000003e0000003f001ffffffffc80000000003803ff80f80004001fffff9ffff80000000030fffff10e0000000fffe03ffbfc0000000fffffffff8600e0000fffc1ff7ffc01f00fffffffffffff8ffc0003ffc3effffffffc3ffffffffffffffffe00787fc7e7fffffffeffffffffffffffffff80380f83fffffffffe43fffffffffffffff7c0000700f07ffffffe003b5fffffffffffefc4000007e07ffff078001c07fffffffffff38600000fe3ffffc010000c1fffffffffffffcf00003fffffff000000043ffffffffffffffd00003ffffffe000000002ffffffffffffffc000073fffffc0000000007fffffffffffff800000ffffffc0000000033ffffffff70ffff000005fffffc0000000010fffffffefffe9f000000fffffc0000000018fffffffefff60f0000003ffffc000000001cdfffffffffa1fe0000003ffff800000000071ffffffffc11ff0000001ffff000000000011fffffffffffff0000000fffe000000000001fffffffffffff8000000cbfc000000000000fffffffffffffc00000081fc000000000001fffff8fffffffe00000081e80000000000001ffff0fffffffe00000311c000000000000107e3e07ffffffe00001e1fc000000000000107e1e03efffffe0000003f000000000000010f80c00ffffffe00000078000000000000020e80c01ffffffe00005c60000000000000060481c01ffffffc0000ffc0000000000000064101000ffffff80007fe0000000000000000e3c00007fffc00000ffe00000000000000007b800003fff000001fff000000000000003173000001fff800003fff80000000000003e126000000fff00001ffff80000000000007801c000000ffe00003ffff8000000000000f06b0000000ffe00003ffff000000000000002000000000ffe00001fffe000000000000037c00000009ffe00001fffe000000000000037e0000000cfff00001fffc00000000000007ff0000000e7ff00000fff80000000000000fffc000000e3fe00000fff00000000000001fffe00000063fe000007ff80000000000003fffe00000003fe000001ff80000000000003fffe00000001fc000001ff80000000000001fffc00000000f8000000ff80000000000001fc3c00000000780000007f80000000000000f80000000000000000003f80000000000400200000000000000000001fc00000000002004000000000000000000007c00000000001800000000000000000000003c00000000000800000000000000000000003c00000000000000000000000000000000003c00000000000000000000000000000000011c00000000000000000000000000000000003c00000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018000000000000003fffffe00f80000000000e0000000000000ffffffffffff7840000000fc00000000000ffffffffffffffffffe0000fc03800000000fffffffffffffffffffc000fffffffc000011fffffffffffffffffff80ffffffffffe00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+function landBit(x, y){
+  const row = y * 36;
+  const nib = parseInt(LAND_HEX[row + 35 - (x >> 2)], 16);
+  return (nib >> (x & 3)) & 1;
+}
+const N_NODES = 560;
+const nodes = [];
+const edges = [];
+
+function buildMesh(){
+  /* land cells weighted by cos(latitude); skip Antarctica */
+  const cells = [], weights = [];
+  let wsum = 0;
+  for(let y=0;y<LAND_H;y++){
+    const lat = (0.5 - (y + .5)/LAND_H) * Math.PI;
+    if(lat < -60 * Math.PI/180) continue;
+    const w = Math.cos(lat);
+    for(let x=0;x<LAND_W;x++){
+      if(!landBit(x, y)) continue;
+      cells.push(x, y);
+      wsum += w;
+      weights.push(wsum);
+    }
+  }
+  for(let i=0;i<N_NODES;i++){
+    /* weighted cell pick */
+    const target = rng() * wsum;
+    let lo = 0, hi = weights.length - 1;
+    while(lo < hi){
+      const mid = (lo + hi) >> 1;
+      if(weights[mid] < target) lo = mid + 1; else hi = mid;
+    }
+    const cx = cells[lo*2], cy = cells[lo*2 + 1];
+    const lon = ((cx + rng())/LAND_W) * TAU - Math.PI;
+    const lat = (0.5 - (cy + rng())/LAND_H) * Math.PI;
+    const cl = Math.cos(lat);
+    const big = rng() < .08;
+    nodes.push({
+      x: cl * Math.cos(lon),
+      y: -Math.sin(lat),                         // north up on screen
+      z: -cl * Math.sin(lon),                    // east to the right
+      r: big ? 2.6 + rng()*1.8 : 1.0 + rng()*1.5,
+      br: big ? .95 : .45 + rng()*.5,
+      seed: i,
+    });
+  }
+  /* edges: land dots link to close neighbours, tracing the continents */
+  const TH = Math.cos(.135);
+  for(let i=0;i<N_NODES;i++){
+    for(let j=i+1;j<N_NODES;j++){
+      const a = nodes[i], b = nodes[j];
+      const dot = a.x*b.x + a.y*b.y + a.z*b.z;
+      if(dot > TH) edges.push([i, j]);
+    }
+  }
+}
+buildMesh();
+
+/* ---------- ocean layer: a sparser blueish web covering the water ---------- */
+const N_OCEAN = 300;
+const oceanNodes = [];
+const oceanEdges = [];       // [i, j, kind]  kind 0: ocean-ocean, 1: ocean-land
+function buildOcean(){
+  const cells = [], weights = [];
+  let wsum = 0;
+  for(let y=0;y<LAND_H;y++){
+    const lat = (0.5 - (y + .5)/LAND_H) * Math.PI;
+    if(lat < -72 * Math.PI/180 || lat > 85 * Math.PI/180) continue;
+    const w = Math.cos(lat);
+    for(let x=0;x<LAND_W;x++){
+      if(landBit(x, y)) continue;
+      cells.push(x, y);
+      wsum += w;
+      weights.push(wsum);
+    }
+  }
+  for(let i=0;i<N_OCEAN;i++){
+    const target = rng() * wsum;
+    let lo = 0, hi = weights.length - 1;
+    while(lo < hi){
+      const mid = (lo + hi) >> 1;
+      if(weights[mid] < target) lo = mid + 1; else hi = mid;
+    }
+    const cx = cells[lo*2], cy = cells[lo*2 + 1];
+    const lon = ((cx + rng())/LAND_W) * TAU - Math.PI;
+    const lat = (0.5 - (cy + rng())/LAND_H) * Math.PI;
+    const cl = Math.cos(lat);
+    oceanNodes.push({
+      x: cl * Math.cos(lon),
+      y: -Math.sin(lat),
+      z: -cl * Math.sin(lon),
+      r: .7 + rng()*1.1,
+      br: .3 + rng()*.3,
+    });
+  }
+  /* ocean web: wider spacing needs a wider link threshold */
+  const TH_O = Math.cos(.24);
+  const TH_C = Math.cos(.17);
+  for(let i=0;i<N_OCEAN;i++){
+    const a = oceanNodes[i];
+    for(let j=i+1;j<N_OCEAN;j++){
+      const b = oceanNodes[j];
+      if(a.x*b.x + a.y*b.y + a.z*b.z > TH_O) oceanEdges.push([i, j, 0]);
+    }
+    /* coastal ties: at most the two nearest land dots */
+    const near = [];
+    for(let j=0;j<N_NODES;j++){
+      const b = nodes[j];
+      const dot = a.x*b.x + a.y*b.y + a.z*b.z;
+      if(dot > TH_C) near.push([dot, j]);
+    }
+    near.sort((p, q) => q[0] - p[0]);
+    for(let k=0;k<Math.min(2, near.length);k++) oceanEdges.push([i, near[k][1], 1]);
+  }
+}
+buildOcean();
+
+/* ---------- StarBurst background ----------
+   port of the user's "Star Burst - Originkit" Framer component,
+   with its preview props baked in: speed 2, starSize 40, opacity 49,
+   flowerIntensity 0, twinkleSpeed 10. Radial spokes rise from the
+   bottom-center horizon; along each spoke, streak pulses travel
+   outward and twinkle. Drawn additively over the CSS dusk gradient
+   (no opaque black plate, no center bloom at intensity 0). */
+const SB = (() => {
+  const SPEED = 2/10, STAR_SIZE = 40/20, OPACITY = 49/100, TWINKLE = 10/20;
+  const SPOKES = 100, PER = 12;
+  const rand = mulberry32(0xBADF00D);
+  /* keep only spokes above the horizon — the rest would never render */
+  const kc = [], ks = [];
+  for(let i=0;i<SPOKES;i++){
+    const a = (i/SPOKES) * TAU + (rand() - .5) * .02;
+    const s = Math.sin(a);
+    if(s > .05) continue;
+    kc.push(Math.cos(a));
+    ks.push(s);
+  }
+  const N_SPOKES = kc.length;
+  const cosA = Float32Array.from(kc), sinA = Float32Array.from(ks);
+  const N = N_SPOKES * PER;
+  const pT = new Float32Array(N), pSpeed = new Float32Array(N),
+        pSize = new Float32Array(N), pPhase = new Float32Array(N);
+  for(let i=0;i<N;i++){
+    pT[i] = -.05 + rand() * 1.1;
+    pSpeed[i] = (.5 + rand()) * .25;
+    pSize[i] = .7 + rand() * .8;
+    pPhase[i] = rand() * TAU;
+  }
+  /* pre-baked streak sprite: transparent tail -> bright head */
+  const sprite = document.createElement('canvas');
+  sprite.width = 64; sprite.height = 2;
+  const sg = sprite.getContext('2d');
+  const grad = sg.createLinearGradient(0, 0, 64, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(.7, 'rgba(255,255,255,.6)');
+  grad.addColorStop(1, 'rgba(255,255,255,1)');
+  sg.fillStyle = grad;
+  sg.fillRect(0, 0, 64, 2);
+
+  let time = 0;
+  function update(dt){
+    time += dt;
+    for(let i=0;i<N;i++){
+      pT[i] += pSpeed[i] * SPEED * dt;
+      if(pT[i] > 1.1){
+        pT[i] = -.05 - rand() * .05;
+        pSize[i] = .7 + rand() * .8;
+        pPhase[i] = rand() * TAU;
+      }
+    }
+  }
+  function render(){
+    const cx = W * .5, cy = H;
+    const RR = Math.sqrt(W*W + H*H);
+    ctx.globalCompositeOperation = 'lighter';
+    for(let i=0;i<N;i++){
+      const t = pT[i];
+      if(t < 0 || t >= 1) continue;
+      const s = i % N_SPOKES;
+      const twinkle = .7 + .3 * Math.sin(time * TWINKLE * 6 + pPhase[i]);
+      let fade;
+      if(t < .06) fade = t / .06;
+      else if(t < .85) fade = 1;
+      else fade = 1 - (t - .85) / .15;
+      const a = Math.min(1, twinkle * fade * (1 + .5*t) * OPACITY);
+      if(a < .005) continue;
+      const dist = t * RR;
+      const px = cx + cosA[s] * dist;
+      const py = cy + sinA[s] * dist;
+      const speedFactor = pSpeed[i] / .25;
+      const lineLen = (8 + 12*speedFactor) * (.7 + .6 * pSize[i] * STAR_SIZE);
+      ctx.setTransform(DPR*cosA[s], DPR*sinA[s], -DPR*sinA[s], DPR*cosA[s], DPR*px, DPR*py);
+      ctx.globalAlpha = a;
+      ctx.drawImage(sprite, -lineLen, -.5, lineLen, 1);
+    }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  return {update, render};
+})();
+
+/* ---------- floating motes between the background and the globe ---------- */
+const FP_N = 90;
+const FX = new Float32Array(FP_N), FY = new Float32Array(FP_N), FZ = new Float32Array(FP_N);
+const FVX = new Float32Array(FP_N), FVY = new Float32Array(FP_N), FVZ = new Float32Array(FP_N);
+const FR2 = new Float32Array(FP_N), FA = new Float32Array(FP_N), FPh = new Float32Array(FP_N);
+const FC = [];
+for(let i=0;i<FP_N;i++){
+  FX[i] = (rng()*2 - 1) * 1.7;                      // units of globe radius R
+  FY[i] = (rng()*2 - 1) * 1.7;
+  FZ[i] = (rng()*2 - 1) * 1.6;
+  FVX[i] = (rng() - .5) * .05;
+  FVY[i] = (rng() - .5) * .05 - .008;               // slight upward drift
+  FVZ[i] = (rng() - .5) * .03;
+  FR2[i] = .6 + rng() * 1.2;
+  FA[i] = .12 + rng() * .3;
+  FPh[i] = rng() * TAU;
+  const c = rng();
+  FC.push(c < .6 ? '#E8EAF4' : c < .8 ? '#A88BF0' : '#6ADCE8');
+}
+function updateFloaters(dt){
+  for(let i=0;i<FP_N;i++){
+    FX[i] += FVX[i] * dt;
+    FY[i] += FVY[i] * dt;
+    FZ[i] += FVZ[i] * dt;
+    if(FX[i] > 1.7) FX[i] = -1.7; else if(FX[i] < -1.7) FX[i] = 1.7;
+    if(FY[i] > 1.7) FY[i] = -1.7; else if(FY[i] < -1.7) FY[i] = 1.7;
+    if(FZ[i] > 1.6) FZ[i] = -1.6; else if(FZ[i] < -1.6) FZ[i] = 1.6;
+  }
+}
+function drawFloaters(front){
+  for(let i=0;i<FP_N;i++){
+    const z = FZ[i];
+    if(front ? z < .2 : z >= .2) continue;
+    const ps = FOV / (FOV - z*R);
+    const sx = CX + FX[i]*R*ps;
+    const sy = CY + FY[i]*R*ps;
+    if(sx < -10 || sx > W+10 || sy < -10 || sy > H+10) continue;
+    const depth = lerp(.3, 1, (z + 1.6) / 3.2);
+    const twinkle = .7 + .3 * Math.sin(simT * .8 + FPh[i]);
+    const a = FA[i] * depth * twinkle;
+    if(a < .02) continue;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = FC[i];
+    ctx.beginPath();
+    ctx.arc(sx, sy, FR2[i] * ps, 0, TAU);
+    ctx.fill();
+  }
+}
+
+/* ---------- camera / mouse (same technique as the constellation globe) ---------- */
+const BASE_TILT = -.30, AUTO_SPIN = .07;
+const INIT_YAW = 3.6;                  // start facing the land-rich hemisphere, not open ocean
+let yaw = INIT_YAW, pitch = BASE_TILT;
+let velYaw = AUTO_SPIN, velPitch = 0;
+let dragging = false, dragDX = 0, dragDY = 0, dragDist = 0;
+let lastPX = 0, lastPY = 0;
+const pointer = {x: -1e6, y: -1e6, active: false};
+
+canvas.addEventListener('pointerdown', e=>{
+  dragging = true; dragDist = 0;
+  canvas.classList.add('dragging');
+  canvas.setPointerCapture(e.pointerId);
+  lastPX = e.clientX; lastPY = e.clientY;
+});
+addEventListener('pointermove', e=>{
+  pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true;
+  if(dragging){
+    dragDX += e.clientX - lastPX;
+    dragDY += e.clientY - lastPY;
+    dragDist += Math.abs(e.clientX - lastPX) + Math.abs(e.clientY - lastPY);
+    lastPX = e.clientX; lastPY = e.clientY;
+  }
+});
+addEventListener('pointerup', ()=>{
+  if(dragging && dragDist < 6) clickLaunch();
+  dragging = false;
+  canvas.classList.remove('dragging');
+});
+canvas.addEventListener('pointerleave', ()=>{ pointer.active = false; });
+
+let M = [1,0,0, 0,1,0, 0,0,1];
+function updateMatrix(){
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const cx = Math.cos(pitch), sx = Math.sin(pitch);
+  M = [
+    cy,      0,     sy,
+    sx*sy,   cx,   -sx*cy,
+    -cx*sy,  sx,    cx*cy,
+  ];
+}
+function viewOf(p){
+  return {
+    x: M[0]*p.x + M[1]*p.y + M[2]*p.z,
+    y: M[3]*p.x + M[4]*p.y + M[5]*p.z,
+    z: M[6]*p.x + M[7]*p.y + M[8]*p.z,
+  };
+}
+function project(p){                            // p: unit vector * lift
+  const v = viewOf(p);
+  const vx = v.x*R, vy = v.y*R, vz = v.z*R;
+  const ps = FOV / (FOV - vz);
+  return {x: CX + vx*ps, y: CY + vy*ps, s: ps, z: v.z};
+}
+
+function advanceCamera(dt){
+  if(dragging){
+    const dy = dragDX * .004, dp = dragDY * .004;
+    yaw += dy; pitch = clamp(pitch + dp, -1.2, 1.2);
+    velYaw = lerp(velYaw, dy/Math.max(dt, 1e-3), .35);
+    velPitch = lerp(velPitch, dp/Math.max(dt, 1e-3), .35);
+    dragDX = dragDY = 0;
+  }else{
+    yaw += velYaw * dt;
+    pitch = clamp(pitch + velPitch * dt, -1.2, 1.2);
+    const decay = Math.pow(.32, dt);
+    velYaw = AUTO_SPIN + (velYaw - AUTO_SPIN) * decay;
+    velPitch *= decay;
+  }
+}
+
+/* ---------- arcs: gradient flight paths between nodes ---------- */
+const ARCS = [];
+const ARC_IN = 1.4, ARC_HOLD = 1.1, ARC_OUT = 1.0;
+const ARC_LIFE = ARC_IN + ARC_HOLD + ARC_OUT;
+let simT = 0, nextArcAt = .8, arcId = 0;
+
+function pickArcPair(fromIdx){
+  for(let tries=0; tries<40; tries++){
+    const i = fromIdx !== undefined ? fromIdx : (arcRng()*N_NODES)|0;
+    const j = (arcRng()*N_NODES)|0;
+    if(i === j) continue;
+    const a = nodes[i], b = nodes[j];
+    const ang = Math.acos(clamp(a.x*b.x + a.y*b.y + a.z*b.z, -1, 1));
+    if(ang > .5 && ang < 2.6) return [i, j];
+  }
+  return null;
+}
+const ARC_SEG = 56;
+function spawnArc(fromIdx){
+  const pair = pickArcPair(fromIdx);
+  if(!pair) return;
+  ARCS.push({
+    a: pair[0], b: pair[1], t0: simT, id: arcId++,
+    bx: new Float32Array(ARC_SEG+1),        // reusable projected-point buffers
+    by: new Float32Array(ARC_SEG+1),
+    bz: new Float32Array(ARC_SEG+1),
+    _head: 0, _tail: 0,
+  });
+}
+function updateArcs(){
+  if(simT >= nextArcAt){
+    if(ARCS.length < 5) spawnArc();
+    nextArcAt = simT + .7 + arcRng()*.7;
+  }
+  let removed = false;
+  for(let i=ARCS.length-1;i>=0;i--){
+    if(simT - ARCS[i].t0 > ARC_LIFE){ ARCS.splice(i, 1); removed = true; }
+  }
+  if(removed){
+    const alive = new Set(ARCS.map(a => a.id));
+    for(const key of explodedPairs){
+      const [x, y] = key.split('_');
+      if(!alive.has(+x) || !alive.has(+y)) explodedPairs.delete(key);
+    }
+  }
+}
+
+/* ---------- sparks: arcs that cross each other explode ---------- */
+const sparks = [];
+const explodedPairs = new Set();
+const sparkRng = mulberry32(SEED * 997 + 3);
+const PURPLE_RGB = [138, 77, 255], CYAN_RGB = [41, 216, 230];
+function arcColorAt(f){
+  return [
+    Math.round(lerp(PURPLE_RGB[0], CYAN_RGB[0], f)),
+    Math.round(lerp(PURPLE_RGB[1], CYAN_RGB[1], f)),
+    Math.round(lerp(PURPLE_RGB[2], CYAN_RGB[2], f)),
+  ];
+}
+function explode(x, y, ca, cb){
+  for(let k=0;k<14;k++){
+    const a = sparkRng()*TAU, sp = 40 + sparkRng()*130;
+    sparks.push({
+      x, y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      t0: simT, life: .35 + sparkRng()*.4,
+      r: 1 + sparkRng()*1.1,
+      c: k < 3 ? [255,255,255] : (k % 2 ? ca : cb),
+    });
+  }
+}
+function updateSparks(dt){
+  const damp = Math.pow(.25, dt);
+  for(let i=sparks.length-1;i>=0;i--){
+    const s = sparks[i];
+    if(simT - s.t0 > s.life){ sparks.splice(i, 1); continue; }
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    s.vx *= damp; s.vy *= damp;
+  }
+}
+function segHit(x1, y1, x2, y2, x3, y3, x4, y4, out){
+  const d1x = x2-x1, d1y = y2-y1, d2x = x4-x3, d2y = y4-y3;
+  const den = d1x*d2y - d1y*d2x;
+  if(Math.abs(den) < 1e-9) return false;
+  const t = ((x3-x1)*d2y - (y3-y1)*d2x)/den;
+  const u = ((x3-x1)*d1y - (y3-y1)*d1x)/den;
+  if(t < 0 || t > 1 || u < 0 || u > 1) return false;
+  out.x = x1 + d1x*t;
+  out.y = y1 + d1y*t;
+  return true;
+}
+const hitPoint = {x: 0, y: 0};
+function detectArcCollisions(){
+  for(let i=0;i<ARCS.length;i++) for(let j=i+1;j<ARCS.length;j++){
+    const A = ARCS[i], B2 = ARCS[j];
+    if(A._head === A._tail || B2._head === B2._tail) continue;
+    const key = Math.min(A.id, B2.id) + '_' + Math.max(A.id, B2.id);
+    if(explodedPairs.has(key)) continue;
+    const STEP = 4;
+    outer:
+    for(let k=STEP;k<=ARC_SEG;k+=STEP){
+      for(let l=STEP;l<=ARC_SEG;l+=STEP){
+        if(segHit(A.bx[k-STEP], A.by[k-STEP], A.bx[k], A.by[k],
+                  B2.bx[l-STEP], B2.by[l-STEP], B2.bx[l], B2.by[l], hitPoint)
+           && A.bz[k] + B2.bz[l] > 0){
+          explodedPairs.add(key);
+          const fa = A._tail + (A._head - A._tail) * k/ARC_SEG;
+          const fb = B2._tail + (B2._head - B2._tail) * l/ARC_SEG;
+          explode(hitPoint.x, hitPoint.y, arcColorAt(fa), arcColorAt(fb));
+          break outer;
+        }
+      }
+    }
+  }
+}
+function clickLaunch(){
+  if(FREEZE_T !== null) return;
+  /* nearest front-face node to the pointer */
+  let best = -1, bd = 60;
+  for(let i=0;i<N_NODES;i++){
+    const p = project(nodes[i]);
+    if(p.z < .1) continue;
+    const d = Math.hypot(p.x - pointer.x, p.y - pointer.y);
+    if(d < bd){ bd = d; best = i; }
+  }
+  if(best >= 0 && ARCS.length < 7) spawnArc(best);
+}
+
+/* slerp between two unit vectors */
+function slerp(a, b, t){
+  let dot = clamp(a.x*b.x + a.y*b.y + a.z*b.z, -1, 1);
+  const th = Math.acos(dot);
+  if(th < 1e-4) return {x:a.x, y:a.y, z:a.z};
+  const s = Math.sin(th);
+  const ka = Math.sin((1-t)*th)/s, kb = Math.sin(t*th)/s;
+  return {x: a.x*ka + b.x*kb, y: a.y*ka + b.y*kb, z: a.z*ka + b.z*kb};
+}
+
+/* ---------- draw ---------- */
+const DEPTH_A = [.08, .2, .5, 1];
+function bucketOf(vz){ return clamp(((vz + 1) * 2) | 0, 0, 3); }
+
+function activeEndpoints(){
+  const set = new Map();      // node index -> strongest phase alpha
+  for(const arc of ARCS){
+    const t = simT - arc.t0;
+    let a = 1;
+    if(t < .3) a = t/.3;
+    else if(t > ARC_IN + ARC_HOLD) a = 1 - (t - ARC_IN - ARC_HOLD)/ARC_OUT;
+    set.set(arc.a, Math.max(set.get(arc.a) || 0, a));
+    set.set(arc.b, Math.max(set.get(arc.b) || 0, a));
+  }
+  return set;
+}
+
+/* reusable projection buffers — no per-frame allocation */
+const PX = new Float32Array(N_NODES), PY = new Float32Array(N_NODES),
+      PS = new Float32Array(N_NODES), PZ = new Float32Array(N_NODES);
+const OXA = new Float32Array(N_OCEAN), OYA = new Float32Array(N_OCEAN),
+      OSA = new Float32Array(N_OCEAN), OZA = new Float32Array(N_OCEAN);
+function projectSet(list, X, Y, Sc, Z){
+  for(let i=0;i<list.length;i++){
+    const n = list[i];
+    const vx = (M[0]*n.x + M[1]*n.y + M[2]*n.z) * R;
+    const vy = (M[3]*n.x + M[4]*n.y + M[5]*n.z) * R;
+    const vz = (M[6]*n.x + M[7]*n.y + M[8]*n.z) * R;
+    const ps = FOV / (FOV - vz);
+    X[i] = CX + vx*ps;
+    Y[i] = CY + vy*ps;
+    Sc[i] = ps;
+    Z[i] = vz / R;
+  }
+}
+
+function draw(){
+  updateMatrix();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  SB.render();
+  drawFloaters(false);
+
+  projectSet(nodes, PX, PY, PS, PZ);
+  projectSet(oceanNodes, OXA, OYA, OSA, OZA);
+
+  ctx.lineWidth = 1;
+  ctx.lineCap = 'round';
+
+  /* ocean web underneath, blueish and faint (backmost bucket is invisible — skipped) */
+  const OB = [null, new Path2D(), new Path2D(), new Path2D()];
+  for(const [i, j, kind] of oceanEdges){
+    const za = OZA[i], zb = kind ? PZ[j] : OZA[j];
+    const b = bucketOf(Math.min(za, zb));
+    if(b === 0) continue;
+    OB[b].moveTo(OXA[i], OYA[i]);
+    OB[b].lineTo(kind ? PX[j] : OXA[j], kind ? PY[j] : OYA[j]);
+  }
+  ctx.strokeStyle = OCEAN_TONE;
+  for(let b=1;b<4;b++){
+    ctx.globalAlpha = .14 * DEPTH_A[b];
+    ctx.stroke(OB[b]);
+  }
+  ctx.fillStyle = OCEAN_TONE;
+  for(let i=0;i<N_OCEAN;i++){
+    const a = oceanNodes[i].br * DEPTH_A[bucketOf(OZA[i])];
+    if(a < .02) continue;
+    ctx.globalAlpha = a;
+    ctx.beginPath();
+    ctx.arc(OXA[i], OYA[i], oceanNodes[i].r * OSA[i], 0, TAU);
+    ctx.fill();
+  }
+
+  /* land mesh edges, batched into depth buckets */
+  const B = [new Path2D(), new Path2D(), new Path2D(), new Path2D()];
+  for(const [i, j] of edges){
+    const b = bucketOf(Math.min(PZ[i], PZ[j]));
+    B[b].moveTo(PX[i], PY[i]);
+    B[b].lineTo(PX[j], PY[j]);
+  }
+  ctx.strokeStyle = '#E8EAF2';
+  for(let b=0;b<4;b++){
+    ctx.globalAlpha = .26 * DEPTH_A[b];
+    ctx.stroke(B[b]);
+  }
+
+  /* hover highlight */
+  let hovered = -1;
+  if(FREEZE_T === null && pointer.active && !dragging){
+    let bd = 28;
+    for(let i=0;i<N_NODES;i++){
+      if(PZ[i] < .1) continue;
+      const d = Math.hypot(PX[i] - pointer.x, PY[i] - pointer.y);
+      if(d < bd){ bd = d; hovered = i; }
+    }
+  }
+
+  /* nodes */
+  const glow = activeEndpoints();
+  for(let i=0;i<N_NODES;i++){
+    const n = nodes[i];
+    const depth = DEPTH_A[bucketOf(PZ[i])];
+    let r = n.r * PS[i];
+    let alpha = n.br * depth;
+    const g = glow.get(i) || 0;
+    if(g > 0 || i === hovered){
+      const k = Math.max(g, i === hovered ? .8 : 0);
+      r *= 1 + .55*k;
+      alpha = Math.max(alpha, (.9 + .1*k) * depth);
+      ctx.globalAlpha = .20 * k * depth;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(PX[i], PY[i], r*3.2, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = clamp(alpha, 0, 1);
+    ctx.fillStyle = '#FAFAFC';
+    ctx.beginPath();
+    ctx.arc(PX[i], PY[i], r, 0, TAU);
+    ctx.fill();
+  }
+
+  /* arcs on top */
+  for(const arc of ARCS){
+    const t = simT - arc.t0;
+    let head = 1, tail = 0, alpha = 1;
+    if(t < ARC_IN) head = easeInOut(t / ARC_IN);
+    if(t > ARC_IN + ARC_HOLD){
+      tail = easeInOut((t - ARC_IN - ARC_HOLD) / ARC_OUT);
+      alpha = 1;
+    }
+    if(head - tail < .01) continue;
+
+    const A = nodes[arc.a], Bn = nodes[arc.b];
+    const ang = Math.acos(clamp(A.x*Bn.x + A.y*Bn.y + A.z*Bn.z, -1, 1));
+    const lift = .22 + .16 * (ang / Math.PI);
+    let zSum = 0;
+    for(let k=0;k<=ARC_SEG;k++){
+      const f = tail + (head - tail) * (k/ARC_SEG);
+      const u = slerp(A, Bn, f);
+      const l = (1 + lift * Math.sin(Math.PI * f)) * R;
+      const vx = M[0]*u.x + M[1]*u.y + M[2]*u.z;
+      const vy = M[3]*u.x + M[4]*u.y + M[5]*u.z;
+      const vz = (M[6]*u.x + M[7]*u.y + M[8]*u.z) * l;
+      const ps = FOV / (FOV - vz);
+      arc.bx[k] = CX + vx*l*ps;
+      arc.by[k] = CY + vy*l*ps;
+      arc.bz[k] = vz / R;
+      zSum += arc.bz[k];
+    }
+    arc._head = head; arc._tail = tail;
+    const depth = lerp(.25, 1, clamp((zSum/(ARC_SEG+1) + 1)/2, 0, 1));
+    const grad = ctx.createLinearGradient(PX[arc.a], PY[arc.a], PX[arc.b], PY[arc.b]);
+    grad.addColorStop(0, ARC_PURPLE);
+    grad.addColorStop(1, ARC_CYAN);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2.1;
+    ctx.globalAlpha = alpha * depth;
+    ctx.beginPath();
+    ctx.moveTo(arc.bx[0], arc.by[0]);
+    for(let k=1;k<=ARC_SEG;k++) ctx.lineTo(arc.bx[k], arc.by[k]);
+    ctx.stroke();
+    /* bright head dot while drawing in */
+    if(t < ARC_IN){
+      ctx.globalAlpha = depth;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(arc.bx[ARC_SEG], arc.by[ARC_SEG], 2.4, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  /* crossings explode into sparks */
+  detectArcCollisions();
+  for(const s of sparks){
+    const a = 1 - (simT - s.t0)/s.life;
+    ctx.globalAlpha = clamp(a, 0, 1);
+    ctx.fillStyle = 'rgb(' + s.c[0] + ',' + s.c[1] + ',' + s.c[2] + ')';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r * (.5 + .5*a), 0, TAU);
+    ctx.fill();
+  }
+  drawFloaters(true);
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- run ---------- */
+function step(dt){
+  simT += dt;
+  updateArcs();
+  updateSparks(dt);
+  SB.update(dt);
+  updateFloaters(dt);
+}
+
+if(FREEZE_T !== null){
+  const steps = Math.round(FREEZE_T * 60);
+  for(let i=0;i<steps;i++) step(1/60);
+  yaw = INIT_YAW + AUTO_SPIN * FREEZE_T;
+  draw();
+}else if(REDUCED){
+  for(let i=0;i<2.8*60;i++) step(1/60);
+  yaw = INIT_YAW + AUTO_SPIN * 2.8;
+  draw();
+}else{
+  /* embed-friendly scheduling: pause entirely when the canvas is
+     scrolled out of view or the tab is hidden; optional ?fps=30 cap */
+  const FPS_CAP = parseFloat(params.get('fps') || '0');
+  const MIN_FRAME = FPS_CAP > 0 ? 1000/FPS_CAP - .5 : 0;
+  let last = performance.now(), lastDraw = 0;
+  let inView = true, active = false;
+
+  function loop(now){
+    if(!active) return;
+    requestAnimationFrame(loop);
+    if(MIN_FRAME && now - lastDraw < MIN_FRAME) return;
+    lastDraw = now;
+    const dt = Math.min((now - last)/1000, .05);
+    last = now;
+    const c0 = performance.now();
+    advanceCamera(dt);
+    step(dt);
+    draw();
+    window.__cost = (window.__cost || 0) * .95 + (performance.now() - c0) * .05;
+  }
+  function setActive(want){
+    if(want === active) return;
+    active = want;
+    if(active){
+      last = performance.now();
+      requestAnimationFrame(loop);
+    }
+  }
+  if('IntersectionObserver' in window){
+    new IntersectionObserver(entries => {
+      inView = entries[0].isIntersecting;
+      setActive(inView && !document.hidden);
+    }).observe(canvas);
+  }
+  document.addEventListener('visibilitychange', ()=>{
+    setActive(inView && !document.hidden);
+  });
+  setActive(true);
+}
+</script>
+</body>
+</html>
+```
+
+### `src/shaders/threeui.css`
+
+Role: shared-style · 1775 lines · 40715 bytes · SHA-256 `efe4447139f1358dd8e9be68edf6fa46cbefbd1de423a4d6c439ca61d2c8eccf`
+
+```css
+.threeui-mount,
+.terrain-plume-component,
+.text-path-study,
+.article-headings-component,
+.animated-top-dock-component,
+.typography-vortex-component,
+.mechanical-keyboard,
+.retro-metallic,
+.landscape-scene,
+.japanese-tower-landscape,
+.sakura-branch-scene,
+.isometric-motion-grid,
+.isometric-illustration,
+.tetrahedron-365,
+.liquid-metal-button,
+.iso-mail-lightshafts,
+.spark-badge,
+.hypnotic-loops,
+.at-the-horizon,
+.scalability-bricks,
+.threeui-background {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mechanical-keyboard {
+  isolation: isolate;
+  background: #090a0c;
+}
+
+.mechanical-keyboard__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #090a0c;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+  touch-action: none;
+}
+
+.mechanical-keyboard__frame.is-ready {
+  opacity: 1;
+}
+
+.retro-metallic {
+  isolation: isolate;
+  background: #08090a;
+}
+
+.retro-metallic__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #08090a;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+  touch-action: none;
+}
+
+.retro-metallic__frame.is-ready {
+  opacity: 1;
+}
+
+.japanese-tower-landscape {
+  isolation: isolate;
+  background: #ecdcbc;
+}
+
+.japanese-tower-landscape__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #ecdcbc;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.japanese-tower-landscape__frame.is-ready {
+  opacity: 1;
+}
+
+.landscape-scene {
+  isolation: isolate;
+  background: #ecdcbc;
+}
+
+.landscape-scene__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #ecdcbc;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+  touch-action: none;
+}
+
+.landscape-scene__frame.is-ready {
+  opacity: 1;
+}
+
+.sakura-branch-scene {
+  isolation: isolate;
+  background: #d4738a;
+}
+
+.sakura-branch-scene__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #d4738a;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.sakura-branch-scene__frame.is-ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sakura-branch-scene__frame {
+    transition: none;
+  }
+}
+
+.isometric-motion-grid {
+  isolation: isolate;
+  background: #08090a;
+}
+
+.isometric-motion-grid__stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1200px;
+  height: 675px;
+  transform-origin: 50% 50%;
+}
+
+.isometric-motion-grid__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #08090a;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.isometric-motion-grid__frame.is-ready {
+  opacity: 1;
+}
+
+.isometric-illustration {
+  isolation: isolate;
+  background: #111;
+}
+
+.isometric-illustration__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #111;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.isometric-illustration__frame.is-ready {
+  opacity: 1;
+}
+
+.tetrahedron-365 {
+  isolation: isolate;
+  background: #000;
+}
+
+.tetrahedron-365__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.tetrahedron-365__frame.is-ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tetrahedron-365__frame {
+    transition: none;
+  }
+}
+
+.liquid-metal-button {
+  isolation: isolate;
+  background: #070708;
+}
+
+.liquid-metal-button__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #070708;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.liquid-metal-button__frame.is-ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-metal-button__frame {
+    transition: none;
+  }
+}
+
+.iso-mail-lightshafts {
+  isolation: isolate;
+  background: #140f0b;
+}
+
+.iso-mail-lightshafts__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #140f0b;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.iso-mail-lightshafts__frame.is-ready {
+  opacity: 1;
+}
+
+.spark-badge {
+  isolation: isolate;
+  background: #000;
+}
+
+.spark-badge__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.spark-badge__frame.is-ready {
+  opacity: 1;
+}
+
+.hypnotic-loops {
+  isolation: isolate;
+  background: #f15a24;
+}
+
+.hypnotic-loops__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #f15a24;
+  opacity: 0;
+}
+
+.hypnotic-loops__frame.is-ready {
+  opacity: 1;
+}
+
+.at-the-horizon {
+  isolation: isolate;
+  background: #000;
+}
+
+.at-the-horizon__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.at-the-horizon__frame.is-ready {
+  opacity: 1;
+}
+
+.scalability-bricks {
+  isolation: isolate;
+  background: #0b0b0c;
+}
+
+.scalability-bricks__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #0b0b0c;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.scalability-bricks__frame.is-ready {
+  opacity: 1;
+}
+
+.text-path-study {
+  isolation: isolate;
+  background: #08090a;
+}
+
+.text-path-study--light {
+  background: #f3f5f8;
+}
+
+.text-path-study-frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  transform-origin: 50% 50%;
+}
+
+.threeui-background {
+  position: relative;
+  isolation: isolate;
+  background: #030304;
+}
+
+.threeui-background.condensation {
+  background: transparent;
+}
+
+.threeui-background.predictive-arc--light,
+.threeui-background.data-pixel-arc--light {
+  background: #f3f6f1;
+}
+
+.typography-vortex-component.typography-vortex-component--light {
+  background: #eef1f6;
+}
+
+.typography-vortex-component--light .typography-vortex-component__hint {
+  color: rgba(28, 30, 38, 0.55);
+}
+
+.threeui-background > canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cross-beam-canvas,
+.terrain-plume-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.terrain-plume-component {
+  pointer-events: none;
+}
+
+.terrain-plume-component {
+  --fe-bg: #030304;
+  --fe-band: clamp(260px, 52cqw, 820px);
+
+  isolation: isolate;
+  container-type: inline-size;
+  background:
+    linear-gradient(180deg, #050505 0%, #020202 44%, #000 100%);
+}
+
+/* Each scene keeps the same engraved grammar and only moves the ground tone the
+   body fill and the reveal cover are painted with. */
+.terrain-plume-component[data-terrain-scene="river"] {
+  --fe-bg: #03070a;
+
+  background:
+    linear-gradient(180deg, #05090d 0%, #020507 44%, #000 100%);
+}
+
+.terrain-plume-component[data-terrain-scene="desert"] {
+  --fe-bg: #0a0603;
+
+  background:
+    linear-gradient(180deg, #0d0805 0%, #060302 44%, #000 100%);
+}
+
+.terrain-plume-component[data-terrain-scene="bridge-city"] {
+  --fe-bg: #03050b;
+
+  background:
+    linear-gradient(180deg, #050810 0%, #020407 44%, #000 100%);
+}
+
+/* The authored plume sits at the foot of its own canvas, where the terrain band
+   buries it. Every scene keeps that exact gradient and only raises the canvas
+   until the glow clears the range — stopping below the far edge of the hatch so
+   the ground line the eye reads as the horizon is also where the sky starts,
+   and the canvas edge itself stays behind the terrain. */
+.terrain-plume-component[data-terrain-scene="river"] .terrain-plume-canvas,
+.terrain-plume-component[data-terrain-scene="desert"] .terrain-plume-canvas,
+.terrain-plume-component[data-terrain-scene="bridge-city"] .terrain-plume-canvas {
+  top: auto;
+  bottom: calc(var(--fe-band) * 0.33);
+}
+
+/* The footer vignette was tuned to bury the plume behind a range that fills the
+   frame. These scenes leave far more open sky, so the same wash is lightened
+   until the glow survives it. */
+.terrain-plume-component[data-terrain-scene="river"]::after,
+.terrain-plume-component[data-terrain-scene="desert"]::after,
+.terrain-plume-component[data-terrain-scene="bridge-city"]::after {
+  background:
+    radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.07), transparent 34%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.3) 72%, rgba(0, 0, 0, 0.62));
+}
+
+.terrain-plume-component::before,
+.terrain-plume-component::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+}
+
+.terrain-plume-component::before {
+  background:
+    linear-gradient(90deg, transparent calc(50% - 0.5px), rgba(255, 255, 255, 0.05) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 11.5vw),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 5.8rem);
+  opacity: 0.74;
+}
+
+.terrain-plume-component::after {
+  background:
+    radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.09), transparent 34%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.62) 72%, rgba(0, 0, 0, 0.9));
+}
+
+.terrain-plume-canvas {
+  z-index: 0;
+}
+
+.footer-engraved-terrain {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: var(--fe-band);
+  pointer-events: none;
+}
+
+.footer-engraved-reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.footer-engraved-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+  background-size: 160px 160px;
+}
+.sunset-valley-scene,
+.sunset-valley-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sunset-valley-scene {
+  position: relative;
+  overflow: hidden;
+  background: #090d16;
+}
+
+.sunset-valley-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.sunset-valley-canvas.is-ready {
+  opacity: 1;
+}
+
+img.sunset-valley-fallback {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.temple-night-scene,
+.temple-night-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.temple-night-scene {
+  position: relative;
+  overflow: hidden;
+  background: #05070a;
+}
+
+.temple-night-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.temple-night-canvas.is-ready {
+  opacity: 1;
+}
+
+.temple-night-unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #a9b2b7;
+  background: #05070a;
+}
+
+.yosemite-sunset-scene,
+.yosemite-sunset-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.yosemite-sunset-scene {
+  position: relative;
+  overflow: hidden;
+  background: #241a26;
+}
+
+.yosemite-sunset-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.yosemite-sunset-canvas.is-ready {
+  opacity: 1;
+}
+
+.yosemite-sunset-unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #e0c3ab;
+  background: #241a26;
+}
+
+.presidio-sunset-scene,
+.presidio-sunset-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.presidio-sunset-scene {
+  position: relative;
+  overflow: hidden;
+  background: #2a1c22;
+}
+
+.presidio-sunset-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.presidio-sunset-canvas.is-ready {
+  opacity: 1;
+}
+
+.presidio-sunset-unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #e6c1ad;
+  background: #2a1c22;
+}
+
+.lake-louise-scene,
+.lake-louise-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lake-louise-scene {
+  position: relative;
+  overflow: hidden;
+  background: #171d2c;
+}
+
+.lake-louise-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.lake-louise-canvas.is-ready {
+  opacity: 1;
+}
+
+.lake-louise-unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #b9c8d6;
+  background: #171d2c;
+}
+
+.bookshelf,
+.bookshelf__canvas,
+.sketchbook,
+.sketchbook__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bookshelf {
+  position: relative;
+  container-type: inline-size;
+  overflow: hidden;
+  background: #171a24;
+  outline: none;
+}
+
+.bookshelf__canvas {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  touch-action: none;
+}
+
+.bookshelf__canvas.is-ready {
+  opacity: 1;
+}
+
+.bookshelf__source-controls {
+  display: none;
+}
+
+.bookshelf__unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  color: #f4eee6;
+  text-align: center;
+}
+
+.sketchbook {
+  position: relative;
+  overflow: hidden;
+  background: #ece7dc;
+}
+
+.sketchbook__frame {
+  border: 0;
+  opacity: 0;
+  background: #ece7dc;
+}
+
+.sketchbook__frame.is-ready {
+  opacity: 1;
+}
+
+@font-face {
+  font-family: "ThreeUI Fragment Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/fragment-mono.woff2") format("woff2");
+}
+
+.article-headings-component,
+.animated-top-dock-component,
+.typography-vortex-component {
+  container-type: inline-size;
+  color: #ecece8;
+  background: #0b0b0b;
+  font-family: "Geist", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.article-headings-component {
+  display: grid;
+  grid-template-rows: auto 1fr 1fr;
+  padding: clamp(20px, 5.4cqw, 74px) clamp(20px, 6.2cqw, 86px);
+  isolation: isolate;
+}
+
+.article-headings-component::after,
+.animated-top-dock-component::after,
+.typography-vortex-component::after {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  content: "";
+  opacity: 0.12;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+}
+
+.article-headings-component__header {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: clamp(14px, 2.6cqw, 30px);
+  color: #62625e;
+  font: 400 clamp(8px, 0.85cqw, 10px) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.12em;
+}
+
+.article-headings-component__entry {
+  display: grid;
+  grid-template-columns: clamp(28px, 4cqw, 56px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(10px, 2.2cqw, 30px);
+  border-top: 1px solid #2a2a28;
+}
+
+.article-headings-component__entry h2 {
+  margin: 0;
+  color: #e9e9e5;
+  font-size: clamp(18px, 3.2cqw, 44px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.article-headings-component__index,
+.article-headings-component__meta {
+  color: #60605c;
+  font: 400 clamp(8px, 0.85cqw, 10px) / 1.3 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.06em;
+}
+
+.article-headings-component__meta {
+  text-align: right;
+}
+
+.article-headings-component--light {
+  color: #202128;
+  background: #f3f5f8;
+}
+
+.article-headings-component--light .article-headings-component__header,
+.article-headings-component--light .article-headings-component__index,
+.article-headings-component--light .article-headings-component__meta {
+  color: #71737b;
+}
+
+.article-headings-component--light .article-headings-component__entry {
+  border-color: #d9dce3;
+}
+
+.article-headings-component--light .article-headings-component__entry h2 {
+  color: #1d1f26;
+}
+
+.typography-vortex-component {
+  position: relative;
+  isolation: isolate;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.typography-vortex-component canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.typography-vortex-component__hint,
+.animated-top-dock-component__caption {
+  position: absolute;
+  z-index: 6;
+  color: #62625e;
+  font: 400 9px/1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.1em;
+}
+
+.typography-vortex-component__hint {
+  right: 18px;
+  bottom: 16px;
+}
+
+.animated-top-dock-component {
+  position: relative;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.035), transparent 34%),
+    #080808;
+}
+
+.animated-top-dock__nav {
+  position: absolute;
+  top: clamp(24px, 5cqw, 46px);
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  gap: 3px;
+  height: 38px;
+  padding: 4px;
+  overflow: visible;
+  border: 1px solid #292929;
+  border-radius: 11px;
+  background: rgba(14, 14, 14, 0.86);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.48), inset 0 1px rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(18px) saturate(75%);
+  transform: translateX(-50%);
+  isolation: isolate;
+}
+
+.animated-top-dock__item {
+  position: relative;
+  z-index: 6;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  outline: none;
+  color: #858580;
+  background: rgba(21, 21, 20, 0.9);
+  font: 400 10px/1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  backdrop-filter: blur(14px) saturate(70%);
+  transform-origin: 50% 0;
+  transition: color 0.15s, border-color 0.18s, background 0.18s, box-shadow 0.18s;
+  will-change: width, height, transform;
+  cursor: pointer;
+}
+
+.animated-top-dock__item[data-dock-near="true"],
+.animated-top-dock__item:focus-visible {
+  z-index: 7;
+  color: #ecece8;
+  border-color: #41413e;
+  background: rgba(27, 27, 26, 0.94);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, 0.26);
+}
+
+.animated-top-dock__logo {
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  background: #e8e8e3;
+}
+
+.animated-top-dock__logo svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.animated-top-dock__link {
+  gap: 6px;
+  width: 94px;
+  padding: 0 9px;
+}
+
+.animated-top-dock__link[aria-pressed="true"] {
+  color: #111;
+  border-color: #e8e8e3;
+  background: #e8e8e3;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.28);
+}
+
+.animated-top-dock__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  opacity: 0.62;
+  transition: opacity 0.16s;
+}
+
+.animated-top-dock__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.animated-top-dock__item[data-dock-near="true"] .animated-top-dock__icon,
+.animated-top-dock__item:focus-visible .animated-top-dock__icon {
+  opacity: 1;
+}
+
+.animated-top-dock-component__caption {
+  right: 18px;
+  bottom: 16px;
+}
+
+@media (max-width: 600px) {
+  .article-headings-component {
+    padding: 18px;
+  }
+
+  .article-headings-component__entry {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .article-headings-component__entry h2 {
+    font-size: clamp(17px, 5.5vw, 26px);
+  }
+
+  .article-headings-component__meta {
+    display: none;
+  }
+
+  .animated-top-dock__nav {
+    top: 24px;
+    gap: 2px;
+    height: 36px;
+  }
+
+  .animated-top-dock__item {
+    height: 26px !important;
+    transform: none !important;
+  }
+
+  .animated-top-dock__logo {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .animated-top-dock__link {
+    width: auto !important;
+    padding: 0 7px;
+    font-size: 8px;
+    letter-spacing: 0.07em;
+  }
+
+  .animated-top-dock__icon {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-top-dock__item {
+    transform: none !important;
+  }
+}
+
+/* ── Top dock variants ────────────────────────────────────────────────────
+   Every dimension below is a container query unit with a clamp, because these
+   bars are shown at anything from a 600 px card to a 1920 px capture frame: a
+   fixed 56 px bar that reads correctly in the catalogue frame becomes a thin
+   strip of small type at full width. One scale block feeds all three. */
+
+.animated-top-dock-component.atd-modern,
+.animated-top-dock-component.atd-retro,
+.animated-top-dock-component.atd-glass {
+  --atd-top: clamp(16px, 2.6cqw, 46px);
+  --atd-bar-width: min(1460px, calc(100% - clamp(24px, 4.2cqw, 96px)));
+  --atd-bar-height: clamp(48px, 3.4cqw, 68px);
+  --atd-bar-pad: clamp(5px, 0.42cqw, 9px);
+  --atd-bar-lead: clamp(14px, 1.15cqw, 25px);
+  --atd-item-height: clamp(30px, 2.2cqw, 44px);
+  --atd-item-pad: clamp(10px, 0.86cqw, 18px);
+  --atd-label: clamp(12px, 0.78cqw, 17px);
+  --atd-icon: clamp(13px, 0.92cqw, 19px);
+  --atd-gap: clamp(5px, 0.44cqw, 9px);
+  --atd-brand: clamp(13px, 0.94cqw, 20px);
+  --atd-mark: clamp(22px, 1.55cqw, 33px);
+  --atd-action-height: clamp(34px, 2.5cqw, 50px);
+  display: block;
+  overflow: hidden;
+}
+
+.atd-modern__bar,
+.atd-retro__bar {
+  position: absolute;
+  top: var(--atd-top);
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: var(--atd-bar-width);
+  height: var(--atd-bar-height);
+  transform: translateX(-50%);
+}
+
+/* Command bar: the bar hugs its own content — brand, dock and actions sit in
+   one flow with a gap between them rather than being pushed to the far edges of
+   a full-bleed strip. That only holds because the dock's track is locked to its
+   rest width (lockTrack in the controller): the spring then grows its items
+   outside that track instead of widening the bar and shoving the brand and the
+   actions around on every pointer move. */
+.atd-modern__bar {
+  /* space-between is inherited rather than centred on purpose: at its natural
+     width the three groups already fill the box, and in a shell too narrow for
+     them the overflow then runs off the right instead of taking the brand off
+     the left as well */
+  width: max-content;
+  max-width: var(--atd-bar-width);
+  padding: var(--atd-bar-pad) var(--atd-bar-pad) var(--atd-bar-pad) var(--atd-bar-lead);
+}
+
+.atd-modern__dock {
+  display: flex;
+  flex: none;
+  gap: clamp(2px, 0.2cqw, 5px);
+  align-items: flex-start;
+  /* the track is one item tall and its rest width wide, and the row is centred
+     inside it, so a growing item overflows evenly on all four sides without
+     moving a single neighbour in the bar */
+  justify-content: center;
+  height: var(--atd-item-height);
+}
+
+.atd-modern__item,
+.atd-retro__item,
+.atd-glass__item {
+  display: inline-flex;
+  flex: none;
+  gap: var(--atd-gap);
+  align-items: center;
+  justify-content: center;
+  height: var(--atd-item-height);
+  padding: 0 var(--atd-item-pad);
+  outline: none;
+  white-space: nowrap;
+  transform-origin: 50% 0;
+  will-change: width, height, transform;
+  cursor: pointer;
+}
+
+.atd-modern__brand,
+.atd-glass__brand,
+.atd-retro__brand {
+  display: inline-flex;
+  flex: none;
+  gap: clamp(7px, 0.6cqw, 13px);
+  align-items: center;
+  text-decoration: none;
+}
+
+.atd-modern__mark,
+.atd-glass__mark {
+  display: block;
+  width: var(--atd-mark);
+  height: var(--atd-mark);
+  overflow: hidden;
+}
+
+.atd-modern__mark svg,
+.atd-glass__mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.atd-modern__word,
+.atd-glass__word {
+  font-size: var(--atd-brand);
+  font-weight: 600;
+  letter-spacing: -0.018em;
+}
+
+.atd-modern__actions {
+  display: inline-flex;
+  flex: none;
+  gap: clamp(4px, 0.34cqw, 8px);
+  align-items: center;
+}
+
+.atd-modern__ghost {
+  height: var(--atd-action-height);
+  padding: 0 clamp(12px, 0.95cqw, 20px);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: 500 var(--atd-label) / 1 inherit;
+  transition: color 0.16s, background 0.16s;
+  cursor: pointer;
+}
+
+.atd-modern__cta,
+.atd-glass__cta {
+  height: var(--atd-action-height);
+  border-radius: 999px;
+  font: 600 var(--atd-label) / 1 inherit;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s;
+  cursor: pointer;
+}
+
+/* ── Modern command bar ─────────────────────────────────────────────────── */
+
+.animated-top-dock-component.atd-modern {
+  /* a ceiling rather than a width: the command bar sizes itself to its own
+     cluster, and only falls back to an inset strip in a shell too narrow to
+     hold it */
+  --atd-bar-width: min(1240px, calc(100% - clamp(24px, 5cqw, 120px)));
+  background: #07080c;
+}
+
+.atd-modern__aurora {
+  position: absolute;
+  inset: -24% -12% auto -12%;
+  z-index: 1;
+  height: 82%;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 62% at 22% 36%, rgba(78, 116, 255, 0.4), transparent 68%),
+    radial-gradient(46% 56% at 78% 20%, rgba(186, 96, 255, 0.3), transparent 70%),
+    radial-gradient(40% 48% at 52% 6%, rgba(56, 220, 214, 0.2), transparent 72%),
+    radial-gradient(34% 40% at 50% 14%, rgba(255, 255, 255, 0.07), transparent 76%);
+  filter: blur(8px);
+}
+
+.atd-modern__bar {
+  gap: clamp(14px, 2.4cqw, 40px);
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(25, 27, 36, 0.86), rgba(12, 13, 18, 0.82));
+  box-shadow: 0 22px 52px -24px rgba(0, 0, 0, 0.92), inset 0 1px rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+.atd-modern__brand {
+  color: #f2f3f7;
+}
+
+.atd-modern__mark {
+  /* a full circle: the shared brand mark is a rounded square, so the disc is cut
+     from it by the mark box's own clip rather than by a second svg */
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+}
+
+.atd-modern__item {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: #9b9fae;
+  background: transparent;
+  font: 500 var(--atd-label) / 1 inherit;
+  letter-spacing: -0.005em;
+  transition: color 0.16s, border-color 0.18s, background 0.18s, box-shadow 0.18s, backdrop-filter 0.18s;
+}
+
+/* :hover is carried alongside the proximity flag so the glass still lands when
+   the spring is off — reduced motion, a coarse pointer, a narrow viewport */
+.atd-modern__item[data-dock-near="true"],
+.atd-modern__item:hover,
+.atd-modern__item:focus-visible {
+  color: #f4f5f9;
+  border-color: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: 0 8px 20px -14px rgba(0, 0, 0, 0.9), inset 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+
+.atd-modern__item[aria-pressed="true"] {
+  color: #0a0b10;
+  border-color: transparent;
+  background: linear-gradient(180deg, #ffffff, #dfe3ef);
+  box-shadow: 0 10px 24px -12px rgba(120, 150, 255, 0.75), inset 0 -1px rgba(0, 0, 0, 0.14);
+}
+
+.atd-modern__icon,
+.atd-glass__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+  opacity: 0.72;
+  transition: opacity 0.16s;
+}
+
+.atd-modern__icon svg,
+.atd-glass__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.atd-modern__item[data-dock-near="true"] .atd-modern__icon,
+.atd-modern__item[aria-pressed="true"] .atd-modern__icon,
+.atd-glass__item[data-dock-near="true"] .atd-glass__icon,
+.atd-glass__item[aria-pressed="true"] .atd-glass__icon {
+  opacity: 1;
+}
+
+.atd-modern__ghost {
+  color: #a7abba;
+}
+
+.atd-modern__ghost:hover {
+  color: #f0f1f6;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.atd-modern__cta {
+  display: inline-flex;
+  gap: var(--atd-gap);
+  align-items: center;
+  padding: 0 var(--atd-bar-pad) 0 clamp(14px, 1.1cqw, 24px);
+  border: 0;
+  color: #0a0b10;
+  background: linear-gradient(180deg, #ffffff, #d8ddec);
+  box-shadow: 0 10px 26px -14px rgba(150, 175, 255, 0.95), inset 0 -1px rgba(0, 0, 0, 0.16);
+}
+
+.atd-modern__cta svg {
+  box-sizing: border-box;
+  width: calc(var(--atd-action-height) - clamp(12px, 0.9cqw, 20px));
+  height: calc(var(--atd-action-height) - clamp(12px, 0.9cqw, 20px));
+  padding: clamp(4px, 0.3cqw, 7px);
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.1);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.atd-modern__cta:hover {
+  box-shadow: 0 16px 32px -14px rgba(150, 175, 255, 1), inset 0 -1px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
+.atd-modern__stage {
+  position: absolute;
+  top: 58%;
+  left: 50%;
+  z-index: 4;
+  width: min(88cqw, 1120px);
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.atd-modern__eyebrow {
+  margin: 0 0 clamp(8px, 0.9cqw, 18px);
+  color: #7d84a0;
+  font: 400 clamp(8px, 0.62cqw, 13px) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.atd-modern__headline {
+  /* background-clip: text paints only inside the element box, so at this size a
+     1.0-ish line-height would cut the ascenders and descenders out of the fill.
+     The padding buys the ink its own room back. */
+  margin: 0;
+  padding: 0.08em 0 0.14em;
+  color: transparent;
+  background: linear-gradient(180deg, #ffffff 16%, rgba(255, 255, 255, 0.3));
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-size: clamp(30px, 7.6cqw, 150px);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+/* ── Retro pixel terminal ───────────────────────────────────────────────────
+   The field canvas is a small drawing buffer stretched by CSS with
+   nearest-neighbour sampling, so its dither pattern arrives as real square
+   pixels. Every chrome edge here is square to sit on that same grid. */
+
+.animated-top-dock-component.atd-retro {
+  --atd-label: clamp(9px, 0.68cqw, 15px);
+  --atd-icon: clamp(10px, 0.78cqw, 17px);
+  --atd-brand: clamp(11px, 0.8cqw, 18px);
+  background: #0b0819;
+}
+
+.atd-retro__field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.atd-retro__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(124% 90% at 50% 34%, transparent 28%, rgba(6, 4, 16, 0.62) 100%),
+    linear-gradient(180deg, rgba(6, 4, 16, 0.6) 0%, transparent 24%, transparent 62%, rgba(6, 4, 16, 0.58) 100%);
+}
+
+/* the raster runs at screen resolution, not at the field's pixel scale, so the
+   line structure stays a raster instead of banding the chunky artwork */
+.atd-retro::before {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+  content: "";
+  opacity: calc(var(--atd-retro-scan, 0.32) * 1.5);
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px);
+}
+
+/* Horizontal fit: the bar is one continuous strip and the menu cells own all of
+   it. There are no gaps and no rounded ends — every cell is separated by a rule
+   and runs the full height, and the controller renormalises the widths so
+   opening one cell takes its room from the neighbours. */
+.atd-retro__bar {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid #f4e6c8;
+  background: #1a1030;
+  box-shadow: 6px 6px 0 rgba(6, 4, 16, 0.62);
+}
+
+.atd-retro__brand {
+  height: 100%;
+  padding: 0 clamp(12px, 1.1cqw, 26px);
+  border-right: 2px solid #4b2f7e;
+  color: #f9c74f;
+  background: #150c28;
+  font: 400 var(--atd-brand) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.12em;
+}
+
+.atd-retro__dock {
+  display: flex;
+  flex: 1 1 0;
+  gap: 0;
+  align-items: stretch;
+  min-width: 0;
+  height: 100%;
+}
+
+.atd-retro__badge {
+  display: inline-flex;
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+}
+
+.atd-retro__badge svg,
+.atd-retro__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+}
+
+.atd-retro__item {
+  height: 100%;
+  min-width: 0;
+  padding: 0 clamp(6px, 0.5cqw, 12px);
+  overflow: hidden;
+  border: 0;
+  border-right: 2px solid #4b2f7e;
+  color: #b9a7e8;
+  background: #241548;
+  font: 400 var(--atd-label) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  transition: color 0.1s steps(2), background 0.1s steps(2);
+}
+
+.atd-retro__item[data-dock-near="true"],
+.atd-retro__item:focus-visible {
+  color: #fff4d6;
+  background: #3a2170;
+}
+
+.atd-retro__item[aria-pressed="true"] {
+  color: #1a1030;
+  background: #f9c74f;
+}
+
+.atd-retro__icon {
+  display: inline-flex;
+  flex: none;
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+}
+
+.atd-retro__cta {
+  display: inline-flex;
+  flex: none;
+  gap: var(--atd-gap);
+  align-items: center;
+  height: 100%;
+  padding: 0 clamp(14px, 1.2cqw, 28px);
+  border: 0;
+  border-left: 2px solid #f4e6c8;
+  color: #1a1030;
+  background: #f47b5c;
+  font: 400 var(--atd-label) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  transition: background 0.1s steps(2), color 0.1s steps(2);
+  cursor: pointer;
+}
+
+.atd-retro__cta:hover {
+  color: #1a1030;
+  background: #f9c74f;
+}
+
+.atd-retro__readout {
+  position: absolute;
+  bottom: clamp(30px, 4.2cqw, 74px);
+  left: 50%;
+  z-index: 8;
+  display: flex;
+  gap: clamp(12px, 2.4cqw, 42px);
+  margin: 0;
+  color: #a08fd4;
+  font: 400 clamp(9px, 0.62cqw, 13px) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.2em;
+  transform: translateX(-50%);
+}
+
+/* ── Liquid glass ───────────────────────────────────────────────────────────
+   Vertical fit: the dock leaves the top edge for a rail down the left side. The
+   proximity field runs on the y axis, so an item grows taller and leans out to
+   the right instead of widening and dropping. The rail is a real
+   backdrop-filter panel over the refracting Three.js bead field, so its blur
+   samples the same pixels the glass shader refracts. */
+
+.animated-top-dock-component.atd-glass {
+  --atd-rail-width: clamp(158px, 12.5cqw, 250px);
+  background: #08090d;
+}
+
+.atd-glass__field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* a scrim behind the rail: the bead field is bright enough in places to swallow
+   the wordmark, and the panel's own blur cannot darken what it samples */
+.atd-glass::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 5;
+  width: 42%;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(90deg, rgba(6, 7, 11, 0.66), rgba(6, 7, 11, 0));
+}
+
+.atd-glass__rail {
+  position: absolute;
+  top: 50%;
+  left: clamp(20px, 3.4cqw, 68px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 0.5cqw, 11px);
+  align-items: stretch;
+  width: var(--atd-rail-width);
+  padding: var(--atd-bar-pad);
+  border-radius: clamp(20px, 1.7cqw, 34px);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+  box-shadow:
+    0 30px 64px -26px rgba(0, 0, 0, 0.92),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(26px) saturate(190%);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  transform: translateY(-50%);
+}
+
+.atd-glass__rail::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  border-radius: inherit;
+  background: linear-gradient(168deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0) 76%, rgba(255, 255, 255, 0.14) 100%);
+}
+
+.atd-glass__brand {
+  position: relative;
+  padding: clamp(6px, 0.5cqw, 12px) clamp(8px, 0.7cqw, 15px);
+  color: #fbfbfe;
+}
+
+.atd-glass__mark {
+  border-radius: clamp(7px, 0.5cqw, 11px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.atd-glass__hairline {
+  height: 1px;
+  margin: clamp(2px, 0.2cqw, 5px) clamp(6px, 0.5cqw, 12px);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.04));
+}
+
+.atd-glass__dock {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(2px, 0.2cqw, 5px);
+  align-items: stretch;
+}
+
+.atd-glass__item {
+  justify-content: flex-start;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: clamp(12px, 1cqw, 22px);
+  color: rgba(255, 255, 255, 0.66);
+  background: transparent;
+  font: 500 var(--atd-label) / 1 inherit;
+  letter-spacing: -0.005em;
+  /* the rail grows downward from each item's own top edge */
+  transform-origin: 0 50%;
+  transition: color 0.18s, border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.atd-glass__item[data-dock-near="true"],
+.atd-glass__item:focus-visible {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.24);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.46), 0 8px 18px -10px rgba(0, 0, 0, 0.8);
+}
+
+.atd-glass__item[aria-pressed="true"] {
+  color: #0d0f16;
+  border-color: rgba(255, 255, 255, 0.6);
+  background: linear-gradient(180deg, #ffffff, #e6e9f4);
+  box-shadow: 0 10px 24px -12px rgba(255, 255, 255, 0.5), inset 0 -1px rgba(0, 0, 0, 0.14);
+}
+
+.atd-glass__cta {
+  display: inline-flex;
+  gap: var(--atd-gap);
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 clamp(12px, 1cqw, 22px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  color: #0d0f16;
+  background: linear-gradient(180deg, #ffffff, #dfe3f0);
+  box-shadow: 0 12px 30px -14px rgba(255, 255, 255, 0.6), inset 0 -1px rgba(0, 0, 0, 0.16);
+}
+
+.atd-glass__cta svg {
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.atd-glass__cta:hover {
+  box-shadow: 0 16px 34px -14px rgba(255, 255, 255, 0.75), inset 0 -1px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
+.atd-modern .animated-top-dock-component__caption,
+.atd-glass .animated-top-dock-component__caption {
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.atd-retro .animated-top-dock-component__caption {
+  z-index: 12;
+  color: #7b6ab0;
+}
+
+@container (max-width: 900px) {
+  .atd-modern__ghost {
+    display: none;
+  }
+
+  .atd-modern__item span:last-child,
+  .atd-retro__item span:last-child {
+    display: none;
+  }
+
+  /* the bar is sized by its content now, so a shell this narrow has to give the
+     content back: the call to action drops to its glyph rather than pushing the
+     cluster past the bar's own max width */
+  .atd-modern__cta span {
+    display: none;
+  }
+
+  .atd-modern__cta {
+    padding: 0 var(--atd-bar-pad);
+  }
+
+  /* the rail collapses to its icons rather than keeping a 158 px column in a
+     card that is only a few hundred pixels wide */
+  .animated-top-dock-component.atd-glass {
+    --atd-rail-width: auto;
+  }
+
+  .atd-glass__item {
+    justify-content: center;
+  }
+
+  .atd-glass__item span:last-child,
+  .atd-glass__word,
+  .atd-glass__cta span {
+    display: none;
+  }
+
+  .atd-glass__cta {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .atd-modern__word {
+    display: none;
+  }
+
+  .atd-modern__item {
+    height: 28px !important;
+    transform: none !important;
+  }
+
+  .atd-glass__item {
+    height: auto !important;
+    transform: none !important;
+  }
+
+  /* the strip keeps its full-height cells on a phone; only the spring stops */
+  .atd-retro__item {
+    height: 100% !important;
+    transform: none !important;
+  }
+
+  .atd-modern__stage {
+    top: 62%;
+  }
+
+  .atd-retro__readout {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atd-modern__item,
+  .atd-retro__item,
+  .atd-glass__item {
+    transform: none !important;
+  }
+}
+```

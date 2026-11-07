@@ -1,0 +1,2176 @@
+# Sign Up Button — Complete source
+
+Component: `SignUpButton`
+Runtime: DOM/CSS + Canvas 2D
+Source revision: `SHA-256 976fe58bea0d`
+
+## Current configured usage
+
+```tsx
+import { SignUpButton } from "@designcodeio/threeui";
+import "@designcodeio/threeui/style.css";
+
+export function Scene() {
+  return (
+    <div className="shader-frame">
+      <SignUpButton />
+    </div>
+  );
+}
+```
+
+## Required assets
+
+No binary assets are required.
+
+## Full implementation source
+
+This bundle contains all 3 required text source files. Preserve their paths and contents; none are excerpts.
+
+### `src/shaders/sign-up-button/SignUpButton.tsx`
+
+Role: component · 78 lines · 2381 bytes · SHA-256 `68bf0b667d3a333a6981d2ea1d09f3442a10e5d8c7b5e56fd3440337539feda9`
+
+```tsx
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+
+import sourceDocument from "./sources/sign-up-button.html?raw";
+
+export type SignUpButtonProps = {
+  className?: string;
+  style?: CSSProperties;
+};
+
+export function SignUpButton({ className = "", style }: SignUpButtonProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [documentVisible, setDocumentVisible] = useState(() => (
+    typeof document === "undefined" || !document.hidden
+  ));
+  // The authored grain generator reads layout synchronously when its script starts.
+  const [hostVisible, setHostVisible] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      setHostVisible(entry?.isIntersecting ?? true);
+    }, { rootMargin: "80px" });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const update = () => setDocumentVisible(!document.hidden);
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+
+  const mounted = hostVisible && documentVisible;
+
+  useEffect(() => {
+    setReady(false);
+  }, [mounted]);
+
+  return (
+    <div
+      ref={hostRef}
+      className={`threeui-background sign-up-button${className ? ` ${className}` : ""}`}
+      role="group"
+      aria-label="Interactive Sign Up Button"
+      data-state={!mounted ? "paused" : ready ? "ready" : "loading"}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        background: "#eeefee",
+        pointerEvents: "auto",
+        ...style,
+      }}
+    >
+      {mounted ? (
+        <iframe
+          title="Sign Up Button"
+          srcDoc={sourceDocument}
+          sandbox="allow-scripts"
+          loading="eager"
+          onLoad={() => setReady(true)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "block",
+            width: "100%",
+            height: "100%",
+            border: 0,
+            background: "#eeefee",
+            pointerEvents: ready ? "auto" : "none",
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+```
+
+### `src/shaders/sign-up-button/sources/sign-up-button.html`
+
+Role: canonical-source · 274 lines · 25926 bytes · SHA-256 `976fe58bea0da226ba0af72e6d9575d4b3cb8ce3076470d4a1f6f69050a0fed1`
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign Up</title>
+<style>
+@font-face{font-family:"RM";font-style:normal;font-weight:100 700;src:url(data:font/woff2;base64,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) format("woff2")}
+:root{--s:calc(min(100vw,100vh)/540);--ease:cubic-bezier(.22,.61,.36,1);--spring:cubic-bezier(.34,1.45,.64,1)}
+html,body{height:100%;margin:0}
+body{background:#eeefee;overflow:hidden;display:grid;place-items:center;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.stage{position:relative;width:540px;height:540px;flex:none;transform:scale(var(--s));transform-origin:center center}
+.btn{position:absolute;left:117.5px;top:211.75px;width:305px;height:116px;border-radius:200px;outline:none}
+.btn *{pointer-events:none}
+/* drop shadows: big soft (idle) / tight (hover) / none (press) */
+.sh{position:absolute;inset:0;border-radius:inherit;transition:opacity .5s var(--ease) .05s,transform .45s var(--spring)}
+.sh-idle{box-shadow:0 17px 16px rgba(0,0,0,.15),0 62px 63px rgba(0,0,0,.35),0 80px 90px rgba(0,0,0,.06);opacity:1}
+.sh-hover{box-shadow:0 3px 4px rgba(0,0,0,.3),0 12px 10px -3px rgba(0,0,0,.5),0 44px 27px rgba(0,0,0,.15);opacity:0;transition:opacity .45s var(--ease),transform .45s var(--spring)}
+.btn.hover .sh-idle{opacity:0;transition:opacity .45s var(--ease),transform .45s var(--spring)}
+.btn.hover .sh-hover{opacity:1}
+.btn.press .sh-idle,.btn.press .sh-hover{opacity:0;transition:opacity .15s var(--ease),transform .12s var(--ease)}
+.btn.press .sh,.btn.press .body{transform:scale(.985)}
+/* body */
+.body{position:absolute;inset:0;border-radius:inherit;overflow:hidden;transition:transform .45s var(--spring);
+  background:linear-gradient(to bottom,#000 0,#797979 1.7%,#838383 5%,#969696 8.7%,#9b9b9b 12%,#989898 15.6%,#909090 20%,#808080 24%,#6b6b6b 28.5%,#5c5c5c 33%,#4d4d4d 37%,#414141 42%,#353535 45%,#333 48.5%,#2e2e2e 52%,#2a2a2a 55%,#222 59%,#1e1e1e 62%,#181818 66%,#161616 69%,#111 73%,#101010 76%,#0a0a0a 80%,#080808 83%,#070707 87%,#030303 90%,#020202 93%,#000 96%)}
+.btn.press .body{transition:transform .12s var(--ease)}
+.grain{position:absolute;inset:0;background-size:100% 100%;background-repeat:no-repeat;
+  -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.03) 0,rgba(0,0,0,.1) 5%,rgba(0,0,0,.22) 12%,rgba(0,0,0,.3) 16%,rgba(0,0,0,.5) 20%,rgba(0,0,0,.66) 24%,rgba(0,0,0,.8) 28%,rgba(0,0,0,.88) 33%,rgba(0,0,0,.95) 40%,rgba(0,0,0,.82) 46%,rgba(0,0,0,.72) 52%,rgba(0,0,0,.72) 58%,rgba(0,0,0,.7) 65%,rgba(0,0,0,.7) 69%,rgba(0,0,0,.48) 73%,rgba(0,0,0,.42) 78%,rgba(0,0,0,.38) 85%,rgba(0,0,0,.25) 91%,rgba(0,0,0,0) 96%);
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.03) 0,rgba(0,0,0,.1) 5%,rgba(0,0,0,.22) 12%,rgba(0,0,0,.3) 16%,rgba(0,0,0,.5) 20%,rgba(0,0,0,.66) 24%,rgba(0,0,0,.8) 28%,rgba(0,0,0,.88) 33%,rgba(0,0,0,.95) 40%,rgba(0,0,0,.82) 46%,rgba(0,0,0,.72) 52%,rgba(0,0,0,.72) 58%,rgba(0,0,0,.7) 65%,rgba(0,0,0,.7) 69%,rgba(0,0,0,.48) 73%,rgba(0,0,0,.42) 78%,rgba(0,0,0,.38) 85%,rgba(0,0,0,.25) 91%,rgba(0,0,0,0) 96%)}
+/* end shading follows the caps and fades out softly (no hard seam) */
+.endl,.endr{position:absolute;inset:0}
+.endl{background:radial-gradient(circle 62px at 58px 50%,rgba(0,0,0,0) 62%,rgba(0,0,0,.06) 72%,rgba(0,0,0,.14) 78%,rgba(0,0,0,.22) 84%,rgba(0,0,0,.26) 90%,rgba(0,0,0,.32) 95%,rgba(0,0,0,.4) 100%);
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 44px,rgba(0,0,0,0) 62px);mask-image:linear-gradient(90deg,#000 0,#000 44px,rgba(0,0,0,0) 62px)}
+.endr{background:radial-gradient(circle 62px at calc(100% - 58px) 50%,rgba(0,0,0,0) 74%,rgba(0,0,0,.1) 84%,rgba(0,0,0,.22) 92%,rgba(0,0,0,.45) 100%);
+  -webkit-mask-image:linear-gradient(270deg,#000 0,#000 44px,rgba(0,0,0,0) 62px);mask-image:linear-gradient(270deg,#000 0,#000 44px,rgba(0,0,0,0) 62px)}
+.rim{position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1.5px #000}
+.label{position:absolute;left:52px;top:-0.75px;height:100%;display:flex;align-items:center;font:340 25.1px/1 "RM","Roboto Mono",ui-monospace,Menlo,monospace;letter-spacing:2px;color:#d0d0d0;white-space:nowrap;transition:color .35s var(--ease) .1s}
+.btn.hover .label,.btn.press .label{color:#fff;transition:color .25s var(--ease)}
+/* knob: socket + lit gap ring + glass sphere */
+.well,.gap,.gapb,.pressdark{position:absolute}
+.well,.gap,.gapb{right:12.75px;top:14.5px;width:90.5px;height:90.5px;border-radius:50%}
+.well{background:#000}
+.gap{background:conic-gradient(from 0deg,rgba(255,255,255,.05) 0,rgba(255,255,255,.07) 40deg,rgba(255,255,255,.3) 75deg,rgba(255,255,255,.47) 90deg,rgba(255,255,255,.3) 105deg,rgba(255,255,255,.18) 120deg,rgba(255,255,255,.1) 150deg,rgba(255,255,255,.06) 180deg,rgba(255,255,255,.1) 210deg,rgba(255,255,255,.18) 240deg,rgba(255,255,255,.3) 255deg,rgba(255,255,255,.47) 270deg,rgba(255,255,255,.3) 285deg,rgba(255,255,255,.07) 320deg,rgba(255,255,255,.05) 360deg);
+  -webkit-mask-image:radial-gradient(circle,rgba(0,0,0,0) 42.3px,rgba(0,0,0,.5) 43.2px,#000 44px,#000 45px,rgba(0,0,0,0) 45.6px);mask-image:radial-gradient(circle,rgba(0,0,0,0) 42.3px,rgba(0,0,0,.5) 43.2px,#000 44px,#000 45px,rgba(0,0,0,0) 45.6px)}
+.gapb{background:linear-gradient(to top,rgba(255,255,255,.25) 0,rgba(255,255,255,.25) 22%,rgba(255,255,255,0) 50%);
+  -webkit-mask-image:radial-gradient(circle,rgba(0,0,0,0) 41.6px,#000 42.4px,#000 45px,rgba(0,0,0,0) 45.6px);mask-image:radial-gradient(circle,rgba(0,0,0,0) 41.6px,#000 42.4px,#000 45px,rgba(0,0,0,0) 45.6px)}
+.pressdark{inset:0;border-radius:inherit;box-shadow:inset 0 0 17px 15px rgba(0,0,0,.95);background:linear-gradient(to bottom,rgba(0,0,0,.35) 0,rgba(0,0,0,.25) 10%,rgba(0,0,0,0) 26%);opacity:0;transition:opacity .4s var(--ease)}
+.btn.press .pressdark{opacity:1;transition:opacity .12s var(--ease)}
+.sphere{position:absolute;right:16px;top:17.75px;width:84px;height:84px;border-radius:50%;overflow:hidden;
+  background:radial-gradient(circle closest-side at 50% 50%,#0b0c0b 0,#0b0c0b 80%,#070707 90%,#040404 96%,#030303 100%);transition:box-shadow .5s var(--ease)}
+.btn.hover .sphere{box-shadow:0 0 3px 0 rgba(20,150,90,.6),0 0 8px 1px rgba(30,200,120,.3)}
+.btn.press .sphere{box-shadow:0 0 3px 1px rgba(40,210,130,.8),0 0 10px 2px rgba(60,240,150,.45);transition:box-shadow .12s var(--ease)}
+.sph-hover,.sph-press,.rimlite,.rimglow,.glow,.potion{position:absolute;inset:0;border-radius:50%}
+.sph-hover{opacity:0;transition:opacity .5s var(--ease);
+  background:radial-gradient(ellipse 45% 25% at 50% 24%,rgba(8,14,10,.85) 0,rgba(8,14,10,.75) 55%,rgba(8,14,10,0) 100%),
+  linear-gradient(to bottom,rgba(0,40,24,.82) 0,rgba(0,40,24,.58) 6%,rgba(0,40,24,.3) 12%,rgba(0,40,24,0) 22%),
+  radial-gradient(ellipse 65% 45% at 50% 100%,rgba(30,200,120,.5) 0,rgba(30,200,120,.28) 50%,rgba(30,200,120,0) 100%),
+  radial-gradient(circle closest-side at 50% 50%,#15191a 0,#15191a 43%,#13241d 50%,#123027 57%,#123c2e 64%,#124a37 71%,#125a40 79%,#147a50 86%,#14925c 93%,#1fa86a 100%)}
+.btn.hover .sph-hover{opacity:1;transition:opacity .4s var(--ease)}
+.sph-press{opacity:0;transition:opacity .3s var(--ease);
+  background:radial-gradient(ellipse 45% 25% at 50% 24%,rgba(8,16,12,.85) 0,rgba(8,16,12,.75) 55%,rgba(8,16,12,0) 100%),
+  linear-gradient(to bottom,rgba(0,60,35,.75) 0,rgba(0,60,35,.55) 6%,rgba(0,60,35,.3) 12%,rgba(0,60,35,0) 22%),
+  radial-gradient(ellipse 65% 45% at 50% 100%,rgba(40,230,140,.55) 0,rgba(40,230,140,.32) 50%,rgba(40,230,140,0) 100%),
+  radial-gradient(circle closest-side at 50% 50%,#101a15 0,#101a15 36%,#0f2a1e 43%,#0f3626 50%,#0f442f 57%,#0f5a3c 64%,#0f6c47 71%,#128757 79%,#16a869 86%,#18c078 93%,#28d48a 100%)}
+.btn.press .sph-press{opacity:1;transition:opacity .12s var(--ease)}
+.potion{width:84px;height:84px;opacity:.85}
+.glow{opacity:0;transition:opacity .5s var(--ease);
+  background:radial-gradient(circle closest-side at 50% 50%,rgba(130,255,195,0) 75%,rgba(130,255,195,.32) 88%,rgba(100,235,170,.4) 100%);
+  -webkit-mask-image:linear-gradient(to top,#000 0,#000 30%,rgba(0,0,0,0) 50%);mask-image:linear-gradient(to top,#000 0,#000 30%,rgba(0,0,0,0) 50%)}
+.btn.hover .glow,.btn.press .glow{opacity:1;transition:opacity .4s var(--ease)}
+.rimlite,.rimglow{-webkit-mask-image:linear-gradient(to top,#000 0,#000 10%,rgba(0,0,0,.5) 18%,rgba(0,0,0,.18) 32%,rgba(0,0,0,0) 50%);mask-image:linear-gradient(to top,#000 0,#000 10%,rgba(0,0,0,.5) 18%,rgba(0,0,0,.18) 32%,rgba(0,0,0,0) 50%)}
+.rimlite{background:radial-gradient(circle at 50% 50%,rgba(220,232,226,0) 27px,rgba(220,232,226,.25) 31px,rgba(220,232,226,.6) 34px,rgba(220,232,226,.97) 37px,rgba(220,232,226,.6) 39.5px,rgba(220,232,226,.45) 42px);transition:opacity .5s var(--ease)}
+.btn.hover .rimlite,.btn.press .rimlite{opacity:0}
+.rimglow{background:radial-gradient(circle at 50% 50%,rgba(150,255,205,0) 30px,rgba(150,255,205,.5) 32.5px,rgba(150,255,205,.9) 33.5px,rgba(160,255,210,1) 36.5px,rgba(90,235,160,.4) 39.5px,rgba(70,220,145,.3) 42px);opacity:0;transition:opacity .5s var(--ease)}
+.btn.hover .rimglow,.btn.press .rimglow{opacity:1;transition:opacity .4s var(--ease)}
+.blob{position:absolute;left:24.5px;top:4.75px;width:35px;height:35px;border-radius:50%;filter:blur(.5px);
+  background:linear-gradient(to bottom,rgba(255,255,255,.33) 0,rgba(255,255,255,.19) 40%,rgba(255,255,255,.07) 75%,rgba(255,255,255,.02) 100%);transition:opacity .4s var(--ease)}
+.btn.hover .blob,.btn.press .blob{opacity:.78}
+.ring{position:absolute;inset:0;opacity:0;transform:scale(.86);transition:opacity .35s var(--ease),transform .45s var(--ease)}
+.ring svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;animation:spin 2.93s linear infinite}
+.ring circle{fill:none;stroke:rgba(205,255,228,.62);stroke-width:1.15;stroke-dasharray:5 3;transition:stroke .2s var(--ease),stroke-width .2s var(--ease)}
+.btn.hover .ring{opacity:1;transform:scale(1);transition:opacity .35s var(--ease) .08s,transform .55s var(--spring) .08s}
+.btn.press .ring{opacity:1;transform:scale(1);transition:opacity .12s var(--ease),transform .12s var(--ease)}
+.btn.press .ring circle{stroke:#d6ff5c;stroke-width:1.4}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* envelope icon */
+.icon{position:absolute;inset:0}
+.icon svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.mail{transform:translate(42px,40px)}
+.mail path,.mail rect,.mail line{fill:none;stroke:rgba(255,255,255,.42);stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round;transition:stroke .4s var(--ease)}
+.btn.hover .mail path,.btn.hover .mail rect,.btn.hover .mail line,.btn.press .mail path,.btn.press .mail rect,.btn.press .mail line{stroke:rgba(228,255,240,.96)}
+.mail .env{fill:rgba(5,12,9,.66)}
+.mail .flapo{transform:scaleY(0);opacity:0;transform-origin:0 -7.5px;transition:transform .45s var(--spring),opacity .2s var(--ease)}
+.mail .flapc{transform-origin:0 -7.5px;transition:transform .3s var(--ease),opacity .2s var(--ease) .05s}
+.mail .letter{transform:translateY(0);opacity:1;transition:transform .5s var(--spring) .05s,opacity .3s var(--ease)}
+.mail .letter rect{fill:rgba(18,26,22,.95)}
+.mail .letter line{stroke-width:1.2;stroke:rgba(255,255,255,.32)}
+.btn.hover .mail .letter line{stroke:rgba(200,255,225,.7)}
+.btn.hover .mail .flapc{opacity:0;transform:scaleY(.15)}
+.btn.hover .mail .flapo{opacity:1;transform:scaleY(1)}
+.btn.hover .mail .letter{transform:translateY(-9px);animation:bob 2.6s ease-in-out .6s infinite}
+.btn.sent .mail .letter{transform:translateY(-34px);opacity:0;transition:transform .38s cubic-bezier(.45,0,.85,.5),opacity .2s var(--ease) .15s;animation:none}
+.btn.press .mail .flapo{transform:scaleY(1.08)}
+@keyframes bob{0%,100%{transform:translateY(-9px)}50%{transform:translateY(-11.5px)}}
+/* fingerprints */
+.prints{position:absolute;inset:0;border-radius:inherit;overflow:hidden}
+.print{position:absolute;width:110px;height:140px;left:0;top:0;opacity:0;transform:scale(.96);transition:opacity .22s var(--ease),transform .32s var(--ease)}
+.print.show{opacity:.32;transform:scale(1)}
+.print.fade{opacity:0;transition:opacity .8s var(--ease)}
+.print canvas{position:absolute;inset:0;width:110px;height:140px;display:block}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="btn" id="btn" role="button" tabindex="0" aria-label="Sign up">
+    <div class="sh sh-idle"></div>
+    <div class="sh sh-hover"></div>
+    <div class="body">
+      <div class="grain" id="grain"></div>
+      <div class="endl"></div>
+      <div class="endr"></div>
+      <div class="rim"></div>
+      <div class="well"></div>
+      <div class="gap"></div>
+      <div class="gapb"></div>
+      <div class="pressdark"></div>
+      <div class="sphere">
+        <div class="sph-hover"></div>
+        <div class="sph-press"></div>
+        <canvas class="potion" id="potion" width="168" height="168"></canvas>
+        <div class="glow"></div>
+        <div class="rimlite"></div>
+        <div class="rimglow"></div>
+        <div class="blob"></div>
+        <div class="ring"><svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="35"/></svg></div>
+        <div class="icon"><svg viewBox="0 0 84 84"><g class="mail">
+          <path class="flapo" d="M-11,-7.5 L0,-16 L11,-7.5"/>
+          <g class="letter"><rect x="-7.5" y="-5" width="15" height="12" rx="1.5"/><line x1="-4.5" y1="-1.5" x2="4.5" y2="-1.5"/><line x1="-4.5" y1="1.8" x2="2" y2="1.8"/></g>
+          <rect class="env" x="-11" y="-7.5" width="22" height="15" rx="2.5"/>
+          <path class="flapc" d="M-11,-5.5 L0,2.5 L11,-5.5"/>
+        </g></svg></div>
+      </div>
+      <div class="label">SIGN UP</div>
+      <div class="prints" id="prints"></div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const btn=document.getElementById('btn'), prints=document.getElementById('prints'), grainEl=document.getElementById('grain');
+  const stage=document.querySelector('.stage');
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+  /* grain texture: 2x speckle field with a skewed brightness distribution */
+  (function makeGrain(){
+    const W=Math.round(btn.offsetWidth*2),H=Math.round(btn.offsetHeight*2),c=document.createElement('canvas');c.width=W;c.height=H;
+    const g=c.getContext('2d'),img=g.createImageData(W,H),d=img.data,r=mulberry32(1337);
+    for(let i=0;i<W*H;i++){const u=r();const a=0.30*Math.pow(u,1.7);d[i*4]=255;d[i*4+1]=255;d[i*4+2]=255;d[i*4+3]=Math.round(a*255)}
+    g.putImageData(img,0,0);grainEl.style.backgroundImage='url('+c.toDataURL()+')';
+  })();
+  /* potion: liquid with rising bubbles and sparkles inside the glass sphere */
+  const potion=(function(){
+    const cv=document.getElementById('potion'),S=84,D=2,g=cv.getContext('2d');g.scale(D,D);
+    const rnd=mulberry32(4242);
+    function np(init){return{x:8+rnd()*68,y:init?26+rnd()*54:80+rnd()*5,r:.35+rnd()*rnd()*1.6,v:.05+rnd()*.15,ph:rnd()*6.28,sw:.25+rnd()*.7,a:.3+rnd()*.7}}
+    const P=[];for(let i=0;i<46;i++)P.push(np(true));
+    let glow=0,target=0,level=52,tLevel=52,t=0,last=performance.now(),burst=[],running=false;
+    const surf=x=>level+Math.sin(x*.18+t*2.1)*1.1+Math.sin(x*.31-t*1.4)*.7;
+    function draw(dt){
+      t+=dt/60;glow+=(target-glow)*Math.min(1,.07*dt);level+=(tLevel-level)*Math.min(1,.05*dt);
+      g.clearRect(0,0,S,S);
+      g.beginPath();g.moveTo(-2,surf(-2));for(let x=1;x<=S+2;x+=3)g.lineTo(x,surf(x));g.lineTo(S+2,S+2);g.lineTo(-2,S+2);g.closePath();
+      const A=.32+glow*.45,lg=g.createLinearGradient(0,level-4,0,S);
+      lg.addColorStop(0,'rgba(70,225,150,'+A+')');lg.addColorStop(.35,'rgba(22,150,92,'+(A*.9)+')');lg.addColorStop(1,'rgba(4,42,28,'+(A*.85)+')');
+      g.fillStyle=lg;g.fill();
+      g.beginPath();for(let x=-2;x<=S+2;x+=2){const y=surf(x);x===-2?g.moveTo(x,y):g.lineTo(x,y)}
+      g.strokeStyle='rgba(175,255,215,'+(.25+glow*.45)+')';g.lineWidth=1;g.stroke();
+      g.globalCompositeOperation='lighter';
+      for(const p of P){
+        p.y-=p.v*dt*(1+glow*.7);p.x+=Math.sin(t*p.sw*3+p.ph)*.12*dt;
+        if(p.y<surf(p.x)+1.5)Object.assign(p,np(false));
+        const al=p.a*(.3+glow*.7)*Math.min(1,(S-p.y)/6);
+        g.beginPath();g.arc(p.x,p.y,p.r,0,6.283);g.fillStyle='rgba(165,255,208,'+al+')';g.shadowColor='rgba(120,255,190,.9)';g.shadowBlur=3+glow*4;g.fill();
+      }
+      g.shadowBlur=0;
+      for(let i=0;i<7;i++){const x=14+((i*11.3+t*4*(i%2?1:-1)+300)%56);const y=level-6-((i*7+t*6)%Math.max(8,level-14));const tw=.5+.5*Math.sin(t*5+i*1.7);
+        g.beginPath();g.arc(x,y,.6+tw*.5,0,6.283);g.fillStyle='rgba(195,255,225,'+((.12+glow*.5)*tw)+')';g.fill()}
+      for(let i=burst.length-1;i>=0;i--){const b=burst[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.vy+=.02*dt;b.l-=dt/38;if(b.l<=0){burst.splice(i,1);continue}
+        g.beginPath();g.arc(b.x,b.y,b.r*b.l,0,6.283);g.fillStyle='rgba(205,255,228,'+(.9*b.l)+')';g.shadowColor='rgba(120,255,190,.9)';g.shadowBlur=4;g.fill()}
+      g.shadowBlur=0;g.globalCompositeOperation='source-over';
+    }
+    function frame(now){const dt=Math.min(40,now-last)/16.67;last=now;draw(dt);requestAnimationFrame(frame)}
+    function start(){if(running)return;running=true;last=performance.now();requestAnimationFrame(frame)}
+    draw(1);start();
+    return{set(s){target=s==='press'?1.3:s==='hover'?1:0;tLevel=s==='idle'?52:47},
+      burst(){for(let i=0;i<18;i++){const a=-Math.PI/2+(rnd()-.5)*1.5,sp=.7+rnd()*1.5;burst.push({x:42+(rnd()-.5)*22,y:level+8,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,r:.8+rnd()*1.4,l:1})}},
+      step(n){for(let i=0;i<n;i++)draw(1)}};
+  })();
+  /* fingerprint generator: ridge field (loop / whorl / arch) rasterised with domain warping, breaks and pressure falloff */
+  function makePrint(seed){
+    const r=mulberry32(seed);const W=110,H=140,D=2;
+    const c=document.createElement('canvas');c.width=W*D;c.height=H*D;const g=c.getContext('2d');
+    const LS=32,latA=new Float32Array(LS*LS),latB=new Float32Array(LS*LS);
+    for(let i=0;i<LS*LS;i++){latA[i]=r()*2-1;latB[i]=r()*2-1}
+    function vn(lat,x,y){const xi=Math.floor(x),yi=Math.floor(y),fx=x-xi,fy=y-yi,sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
+      const x0=((xi%LS)+LS)%LS,x1=(x0+1)%LS,y0=((yi%LS)+LS)%LS,y1=(y0+1)%LS;
+      return (lat[y0*LS+x0]*(1-sx)+lat[y0*LS+x1]*sx)*(1-sy)+(lat[y1*LS+x0]*(1-sx)+lat[y1*LS+x1]*sx)*sy}
+    function fbm(lat,x,y){return vn(lat,x,y)*.6+vn(lat,x*2.1+3.7,y*2.1+1.3)*.28+vn(lat,x*4.3+9.1,y*4.3+5.2)*.12}
+    const ss=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t)};
+    const tr=r(),type=tr<.58?'loop':(tr<.85?'whorl':'arch');
+    const cx=55,cy=48,sp=2.55+r()*.45,wAmp=3.5+r()*3.5,wF=1/(34+r()*10);
+    const tilt=(r()-.5)*.4,ct=Math.cos(tilt),st=Math.sin(tilt);
+    const spiral=r()<.5?0:(r()<.5?1:-1),ell=1.05+r()*.2,archA=10+r()*6,archS=15+r()*8,diverge=.002+r()*.003;
+    const img=g.createImageData(W*D,H*D),d=img.data;
+    for(let py=0;py<H*D;py++)for(let px=0;px<W*D;px++){
+      const x=px/D,y=py/D;
+      const wx=x+fbm(latA,x*wF,y*wF)*wAmp,wy=y+fbm(latB,x*wF+5,y*wF+7)*wAmp;
+      const dx=wx-cx,dy=wy-cy,ux=dx*ct-dy*st,uy=dx*st+dy*ct;
+      let f;
+      if(type==='loop'){f=uy<0?Math.hypot(ux,uy):Math.abs(ux)/(1+uy*diverge)+0}
+      else if(type==='whorl'){f=Math.hypot(ux,uy/ell)+spiral*Math.atan2(uy,ux)*sp/(2*Math.PI)}
+      else{f=uy+archA*Math.exp(-(ux*ux)/(archS*archS))}
+      const ph=2*Math.PI*f/sp,ridge=ss(-.12,.5,Math.cos(ph));
+      const br=fbm(latB,x*.11+40,y*.11+40),cut=ss(-.52,-.34,br);
+      const ex=(x-cx)/43,ey=(y-cy-16)/58,re=Math.hypot(ex,ey);
+      const en=fbm(latA,x*.05+20,y*.05+20)*.16,mask=ss(1.08+en,.78+en,re);
+      const pr=.55+.45*(1-Math.min(1,re)),gr=.82+.18*vn(latA,x*.9+11,y*.9+3);
+      const a=Math.min(1,ridge*cut*mask*pr*gr+mask*.05);
+      const o=(py*W*D+px)*4;d[o]=255;d[o+1]=255;d[o+2]=255;d[o+3]=Math.round(a*255);
+    }
+    g.putImageData(img,0,0);
+    return c;
+  }
+  let seed=7;
+  function addPrint(x,y,rot,hold){
+    const el=document.createElement('div');el.className='print';seed+=1;
+    const cv=makePrint(seed);cv.style.transform='rotate('+rot+'deg)';cv.style.transformOrigin='55px 55px';el.appendChild(cv);
+    el.style.left=(x-55-2)+'px';el.style.top=(y-48-15)+'px';el.style.transformOrigin='55px 55px';
+    prints.appendChild(el);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));
+    if(hold===Infinity){el.classList.add('show')}else{setTimeout(()=>el.classList.add('fade'),hold);setTimeout(()=>el.remove(),hold+900)}
+    return el;
+  }
+  /* interaction */
+  let pressed=false,sentTimer=0;const rnd=mulberry32(99);
+  function setState(){potion.set(btn.classList.contains('press')?'press':btn.classList.contains('hover')?'hover':'idle')}
+  function localPoint(e){const r=stage.getBoundingClientRect();const s=r.width/540;const br=btn.getBoundingClientRect();return{x:(e.clientX-br.left)/s,y:(e.clientY-br.top)/s}}
+  function release(withPrint,e){
+    if(!pressed)return;pressed=false;btn.classList.remove('press');
+    if(withPrint){const p=e?localPoint(e):{x:btn.offsetWidth*.45,y:btn.offsetHeight*.5};addPrint(p.x,p.y,-35+rnd()*70,3000);potion.burst();
+      btn.classList.add('sent');clearTimeout(sentTimer);sentTimer=setTimeout(()=>btn.classList.remove('sent'),480)}
+    setState();
+  }
+  btn.addEventListener('pointerenter',()=>{btn.classList.add('hover');setState()});
+  btn.addEventListener('pointerleave',()=>{btn.classList.remove('hover');release(false);setState()});
+  btn.addEventListener('pointerdown',e=>{if(e.button!==undefined&&e.button!==0)return;pressed=true;btn.classList.add('press');btn.classList.add('hover');setState();try{btn.setPointerCapture(e.pointerId)}catch(_){}});
+  btn.addEventListener('pointerup',e=>release(true,e));
+  btn.addEventListener('pointercancel',()=>release(false));
+  btn.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){if(!pressed){pressed=true;btn.classList.add('press');setState()}e.preventDefault()}});
+  btn.addEventListener('keyup',e=>{if((e.key===' '||e.key==='Enter')&&pressed)release(true,null)});
+  btn.addEventListener('contextmenu',e=>e.preventDefault());
+  /* test hooks: #hover #press #fp */
+  const h=location.hash.replace('#','');
+  if(h){
+    const st=document.createElement('style');st.textContent='*{transition:none!important}';document.head.appendChild(st);
+    if(h.includes('hover'))btn.classList.add('hover');
+    if(h.includes('press')){btn.classList.add('hover');btn.classList.add('press')}
+    if(h.includes('fp')){const n=parseInt(h.replace(/.*fp/,''))||1;for(let i=0;i<n;i++)addPrint(60+i*62,50+(i%2)*30,-30+i*25,Infinity)}
+    setState();potion.step(60);
+  }
+  window.__btn={addPrint,btn,potion};
+})();
+</script>
+</body>
+</html>
+```
+
+### `src/shaders/threeui.css`
+
+Role: shared-style · 1775 lines · 40715 bytes · SHA-256 `efe4447139f1358dd8e9be68edf6fa46cbefbd1de423a4d6c439ca61d2c8eccf`
+
+```css
+.threeui-mount,
+.terrain-plume-component,
+.text-path-study,
+.article-headings-component,
+.animated-top-dock-component,
+.typography-vortex-component,
+.mechanical-keyboard,
+.retro-metallic,
+.landscape-scene,
+.japanese-tower-landscape,
+.sakura-branch-scene,
+.isometric-motion-grid,
+.isometric-illustration,
+.tetrahedron-365,
+.liquid-metal-button,
+.iso-mail-lightshafts,
+.spark-badge,
+.hypnotic-loops,
+.at-the-horizon,
+.scalability-bricks,
+.threeui-background {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mechanical-keyboard {
+  isolation: isolate;
+  background: #090a0c;
+}
+
+.mechanical-keyboard__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #090a0c;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+  touch-action: none;
+}
+
+.mechanical-keyboard__frame.is-ready {
+  opacity: 1;
+}
+
+.retro-metallic {
+  isolation: isolate;
+  background: #08090a;
+}
+
+.retro-metallic__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #08090a;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+  touch-action: none;
+}
+
+.retro-metallic__frame.is-ready {
+  opacity: 1;
+}
+
+.japanese-tower-landscape {
+  isolation: isolate;
+  background: #ecdcbc;
+}
+
+.japanese-tower-landscape__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #ecdcbc;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.japanese-tower-landscape__frame.is-ready {
+  opacity: 1;
+}
+
+.landscape-scene {
+  isolation: isolate;
+  background: #ecdcbc;
+}
+
+.landscape-scene__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #ecdcbc;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+  touch-action: none;
+}
+
+.landscape-scene__frame.is-ready {
+  opacity: 1;
+}
+
+.sakura-branch-scene {
+  isolation: isolate;
+  background: #d4738a;
+}
+
+.sakura-branch-scene__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #d4738a;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.sakura-branch-scene__frame.is-ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sakura-branch-scene__frame {
+    transition: none;
+  }
+}
+
+.isometric-motion-grid {
+  isolation: isolate;
+  background: #08090a;
+}
+
+.isometric-motion-grid__stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1200px;
+  height: 675px;
+  transform-origin: 50% 50%;
+}
+
+.isometric-motion-grid__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #08090a;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.isometric-motion-grid__frame.is-ready {
+  opacity: 1;
+}
+
+.isometric-illustration {
+  isolation: isolate;
+  background: #111;
+}
+
+.isometric-illustration__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #111;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.isometric-illustration__frame.is-ready {
+  opacity: 1;
+}
+
+.tetrahedron-365 {
+  isolation: isolate;
+  background: #000;
+}
+
+.tetrahedron-365__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.tetrahedron-365__frame.is-ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tetrahedron-365__frame {
+    transition: none;
+  }
+}
+
+.liquid-metal-button {
+  isolation: isolate;
+  background: #070708;
+}
+
+.liquid-metal-button__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #070708;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.liquid-metal-button__frame.is-ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-metal-button__frame {
+    transition: none;
+  }
+}
+
+.iso-mail-lightshafts {
+  isolation: isolate;
+  background: #140f0b;
+}
+
+.iso-mail-lightshafts__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #140f0b;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.iso-mail-lightshafts__frame.is-ready {
+  opacity: 1;
+}
+
+.spark-badge {
+  isolation: isolate;
+  background: #000;
+}
+
+.spark-badge__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.spark-badge__frame.is-ready {
+  opacity: 1;
+}
+
+.hypnotic-loops {
+  isolation: isolate;
+  background: #f15a24;
+}
+
+.hypnotic-loops__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #f15a24;
+  opacity: 0;
+}
+
+.hypnotic-loops__frame.is-ready {
+  opacity: 1;
+}
+
+.at-the-horizon {
+  isolation: isolate;
+  background: #000;
+}
+
+.at-the-horizon__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.at-the-horizon__frame.is-ready {
+  opacity: 1;
+}
+
+.scalability-bricks {
+  isolation: isolate;
+  background: #0b0b0c;
+}
+
+.scalability-bricks__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #0b0b0c;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.scalability-bricks__frame.is-ready {
+  opacity: 1;
+}
+
+.text-path-study {
+  isolation: isolate;
+  background: #08090a;
+}
+
+.text-path-study--light {
+  background: #f3f5f8;
+}
+
+.text-path-study-frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  transform-origin: 50% 50%;
+}
+
+.threeui-background {
+  position: relative;
+  isolation: isolate;
+  background: #030304;
+}
+
+.threeui-background.condensation {
+  background: transparent;
+}
+
+.threeui-background.predictive-arc--light,
+.threeui-background.data-pixel-arc--light {
+  background: #f3f6f1;
+}
+
+.typography-vortex-component.typography-vortex-component--light {
+  background: #eef1f6;
+}
+
+.typography-vortex-component--light .typography-vortex-component__hint {
+  color: rgba(28, 30, 38, 0.55);
+}
+
+.threeui-background > canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cross-beam-canvas,
+.terrain-plume-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.terrain-plume-component {
+  pointer-events: none;
+}
+
+.terrain-plume-component {
+  --fe-bg: #030304;
+  --fe-band: clamp(260px, 52cqw, 820px);
+
+  isolation: isolate;
+  container-type: inline-size;
+  background:
+    linear-gradient(180deg, #050505 0%, #020202 44%, #000 100%);
+}
+
+/* Each scene keeps the same engraved grammar and only moves the ground tone the
+   body fill and the reveal cover are painted with. */
+.terrain-plume-component[data-terrain-scene="river"] {
+  --fe-bg: #03070a;
+
+  background:
+    linear-gradient(180deg, #05090d 0%, #020507 44%, #000 100%);
+}
+
+.terrain-plume-component[data-terrain-scene="desert"] {
+  --fe-bg: #0a0603;
+
+  background:
+    linear-gradient(180deg, #0d0805 0%, #060302 44%, #000 100%);
+}
+
+.terrain-plume-component[data-terrain-scene="bridge-city"] {
+  --fe-bg: #03050b;
+
+  background:
+    linear-gradient(180deg, #050810 0%, #020407 44%, #000 100%);
+}
+
+/* The authored plume sits at the foot of its own canvas, where the terrain band
+   buries it. Every scene keeps that exact gradient and only raises the canvas
+   until the glow clears the range — stopping below the far edge of the hatch so
+   the ground line the eye reads as the horizon is also where the sky starts,
+   and the canvas edge itself stays behind the terrain. */
+.terrain-plume-component[data-terrain-scene="river"] .terrain-plume-canvas,
+.terrain-plume-component[data-terrain-scene="desert"] .terrain-plume-canvas,
+.terrain-plume-component[data-terrain-scene="bridge-city"] .terrain-plume-canvas {
+  top: auto;
+  bottom: calc(var(--fe-band) * 0.33);
+}
+
+/* The footer vignette was tuned to bury the plume behind a range that fills the
+   frame. These scenes leave far more open sky, so the same wash is lightened
+   until the glow survives it. */
+.terrain-plume-component[data-terrain-scene="river"]::after,
+.terrain-plume-component[data-terrain-scene="desert"]::after,
+.terrain-plume-component[data-terrain-scene="bridge-city"]::after {
+  background:
+    radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.07), transparent 34%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.3) 72%, rgba(0, 0, 0, 0.62));
+}
+
+.terrain-plume-component::before,
+.terrain-plume-component::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+}
+
+.terrain-plume-component::before {
+  background:
+    linear-gradient(90deg, transparent calc(50% - 0.5px), rgba(255, 255, 255, 0.05) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 11.5vw),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 5.8rem);
+  opacity: 0.74;
+}
+
+.terrain-plume-component::after {
+  background:
+    radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.09), transparent 34%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.62) 72%, rgba(0, 0, 0, 0.9));
+}
+
+.terrain-plume-canvas {
+  z-index: 0;
+}
+
+.footer-engraved-terrain {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: var(--fe-band);
+  pointer-events: none;
+}
+
+.footer-engraved-reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.footer-engraved-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+  background-size: 160px 160px;
+}
+.sunset-valley-scene,
+.sunset-valley-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sunset-valley-scene {
+  position: relative;
+  overflow: hidden;
+  background: #090d16;
+}
+
+.sunset-valley-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.sunset-valley-canvas.is-ready {
+  opacity: 1;
+}
+
+img.sunset-valley-fallback {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.temple-night-scene,
+.temple-night-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.temple-night-scene {
+  position: relative;
+  overflow: hidden;
+  background: #05070a;
+}
+
+.temple-night-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.temple-night-canvas.is-ready {
+  opacity: 1;
+}
+
+.temple-night-unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #a9b2b7;
+  background: #05070a;
+}
+
+.yosemite-sunset-scene,
+.yosemite-sunset-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.yosemite-sunset-scene {
+  position: relative;
+  overflow: hidden;
+  background: #241a26;
+}
+
+.yosemite-sunset-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.yosemite-sunset-canvas.is-ready {
+  opacity: 1;
+}
+
+.yosemite-sunset-unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #e0c3ab;
+  background: #241a26;
+}
+
+.presidio-sunset-scene,
+.presidio-sunset-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.presidio-sunset-scene {
+  position: relative;
+  overflow: hidden;
+  background: #2a1c22;
+}
+
+.presidio-sunset-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.presidio-sunset-canvas.is-ready {
+  opacity: 1;
+}
+
+.presidio-sunset-unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #e6c1ad;
+  background: #2a1c22;
+}
+
+.lake-louise-scene,
+.lake-louise-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lake-louise-scene {
+  position: relative;
+  overflow: hidden;
+  background: #171d2c;
+}
+
+.lake-louise-canvas {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  touch-action: none;
+}
+
+.lake-louise-canvas.is-ready {
+  opacity: 1;
+}
+
+.lake-louise-unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #b9c8d6;
+  background: #171d2c;
+}
+
+.bookshelf,
+.bookshelf__canvas,
+.sketchbook,
+.sketchbook__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bookshelf {
+  position: relative;
+  container-type: inline-size;
+  overflow: hidden;
+  background: #171a24;
+  outline: none;
+}
+
+.bookshelf__canvas {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  touch-action: none;
+}
+
+.bookshelf__canvas.is-ready {
+  opacity: 1;
+}
+
+.bookshelf__source-controls {
+  display: none;
+}
+
+.bookshelf__unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  color: #f4eee6;
+  text-align: center;
+}
+
+.sketchbook {
+  position: relative;
+  overflow: hidden;
+  background: #ece7dc;
+}
+
+.sketchbook__frame {
+  border: 0;
+  opacity: 0;
+  background: #ece7dc;
+}
+
+.sketchbook__frame.is-ready {
+  opacity: 1;
+}
+
+@font-face {
+  font-family: "ThreeUI Fragment Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/fragment-mono.woff2") format("woff2");
+}
+
+.article-headings-component,
+.animated-top-dock-component,
+.typography-vortex-component {
+  container-type: inline-size;
+  color: #ecece8;
+  background: #0b0b0b;
+  font-family: "Geist", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.article-headings-component {
+  display: grid;
+  grid-template-rows: auto 1fr 1fr;
+  padding: clamp(20px, 5.4cqw, 74px) clamp(20px, 6.2cqw, 86px);
+  isolation: isolate;
+}
+
+.article-headings-component::after,
+.animated-top-dock-component::after,
+.typography-vortex-component::after {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  content: "";
+  opacity: 0.12;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+}
+
+.article-headings-component__header {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: clamp(14px, 2.6cqw, 30px);
+  color: #62625e;
+  font: 400 clamp(8px, 0.85cqw, 10px) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.12em;
+}
+
+.article-headings-component__entry {
+  display: grid;
+  grid-template-columns: clamp(28px, 4cqw, 56px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(10px, 2.2cqw, 30px);
+  border-top: 1px solid #2a2a28;
+}
+
+.article-headings-component__entry h2 {
+  margin: 0;
+  color: #e9e9e5;
+  font-size: clamp(18px, 3.2cqw, 44px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.article-headings-component__index,
+.article-headings-component__meta {
+  color: #60605c;
+  font: 400 clamp(8px, 0.85cqw, 10px) / 1.3 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.06em;
+}
+
+.article-headings-component__meta {
+  text-align: right;
+}
+
+.article-headings-component--light {
+  color: #202128;
+  background: #f3f5f8;
+}
+
+.article-headings-component--light .article-headings-component__header,
+.article-headings-component--light .article-headings-component__index,
+.article-headings-component--light .article-headings-component__meta {
+  color: #71737b;
+}
+
+.article-headings-component--light .article-headings-component__entry {
+  border-color: #d9dce3;
+}
+
+.article-headings-component--light .article-headings-component__entry h2 {
+  color: #1d1f26;
+}
+
+.typography-vortex-component {
+  position: relative;
+  isolation: isolate;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.typography-vortex-component canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.typography-vortex-component__hint,
+.animated-top-dock-component__caption {
+  position: absolute;
+  z-index: 6;
+  color: #62625e;
+  font: 400 9px/1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.1em;
+}
+
+.typography-vortex-component__hint {
+  right: 18px;
+  bottom: 16px;
+}
+
+.animated-top-dock-component {
+  position: relative;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.035), transparent 34%),
+    #080808;
+}
+
+.animated-top-dock__nav {
+  position: absolute;
+  top: clamp(24px, 5cqw, 46px);
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  gap: 3px;
+  height: 38px;
+  padding: 4px;
+  overflow: visible;
+  border: 1px solid #292929;
+  border-radius: 11px;
+  background: rgba(14, 14, 14, 0.86);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.48), inset 0 1px rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(18px) saturate(75%);
+  transform: translateX(-50%);
+  isolation: isolate;
+}
+
+.animated-top-dock__item {
+  position: relative;
+  z-index: 6;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  outline: none;
+  color: #858580;
+  background: rgba(21, 21, 20, 0.9);
+  font: 400 10px/1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  backdrop-filter: blur(14px) saturate(70%);
+  transform-origin: 50% 0;
+  transition: color 0.15s, border-color 0.18s, background 0.18s, box-shadow 0.18s;
+  will-change: width, height, transform;
+  cursor: pointer;
+}
+
+.animated-top-dock__item[data-dock-near="true"],
+.animated-top-dock__item:focus-visible {
+  z-index: 7;
+  color: #ecece8;
+  border-color: #41413e;
+  background: rgba(27, 27, 26, 0.94);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, 0.26);
+}
+
+.animated-top-dock__logo {
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  background: #e8e8e3;
+}
+
+.animated-top-dock__logo svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.animated-top-dock__link {
+  gap: 6px;
+  width: 94px;
+  padding: 0 9px;
+}
+
+.animated-top-dock__link[aria-pressed="true"] {
+  color: #111;
+  border-color: #e8e8e3;
+  background: #e8e8e3;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.28);
+}
+
+.animated-top-dock__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  opacity: 0.62;
+  transition: opacity 0.16s;
+}
+
+.animated-top-dock__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.animated-top-dock__item[data-dock-near="true"] .animated-top-dock__icon,
+.animated-top-dock__item:focus-visible .animated-top-dock__icon {
+  opacity: 1;
+}
+
+.animated-top-dock-component__caption {
+  right: 18px;
+  bottom: 16px;
+}
+
+@media (max-width: 600px) {
+  .article-headings-component {
+    padding: 18px;
+  }
+
+  .article-headings-component__entry {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .article-headings-component__entry h2 {
+    font-size: clamp(17px, 5.5vw, 26px);
+  }
+
+  .article-headings-component__meta {
+    display: none;
+  }
+
+  .animated-top-dock__nav {
+    top: 24px;
+    gap: 2px;
+    height: 36px;
+  }
+
+  .animated-top-dock__item {
+    height: 26px !important;
+    transform: none !important;
+  }
+
+  .animated-top-dock__logo {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .animated-top-dock__link {
+    width: auto !important;
+    padding: 0 7px;
+    font-size: 8px;
+    letter-spacing: 0.07em;
+  }
+
+  .animated-top-dock__icon {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-top-dock__item {
+    transform: none !important;
+  }
+}
+
+/* ── Top dock variants ────────────────────────────────────────────────────
+   Every dimension below is a container query unit with a clamp, because these
+   bars are shown at anything from a 600 px card to a 1920 px capture frame: a
+   fixed 56 px bar that reads correctly in the catalogue frame becomes a thin
+   strip of small type at full width. One scale block feeds all three. */
+
+.animated-top-dock-component.atd-modern,
+.animated-top-dock-component.atd-retro,
+.animated-top-dock-component.atd-glass {
+  --atd-top: clamp(16px, 2.6cqw, 46px);
+  --atd-bar-width: min(1460px, calc(100% - clamp(24px, 4.2cqw, 96px)));
+  --atd-bar-height: clamp(48px, 3.4cqw, 68px);
+  --atd-bar-pad: clamp(5px, 0.42cqw, 9px);
+  --atd-bar-lead: clamp(14px, 1.15cqw, 25px);
+  --atd-item-height: clamp(30px, 2.2cqw, 44px);
+  --atd-item-pad: clamp(10px, 0.86cqw, 18px);
+  --atd-label: clamp(12px, 0.78cqw, 17px);
+  --atd-icon: clamp(13px, 0.92cqw, 19px);
+  --atd-gap: clamp(5px, 0.44cqw, 9px);
+  --atd-brand: clamp(13px, 0.94cqw, 20px);
+  --atd-mark: clamp(22px, 1.55cqw, 33px);
+  --atd-action-height: clamp(34px, 2.5cqw, 50px);
+  display: block;
+  overflow: hidden;
+}
+
+.atd-modern__bar,
+.atd-retro__bar {
+  position: absolute;
+  top: var(--atd-top);
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: var(--atd-bar-width);
+  height: var(--atd-bar-height);
+  transform: translateX(-50%);
+}
+
+/* Command bar: the bar hugs its own content — brand, dock and actions sit in
+   one flow with a gap between them rather than being pushed to the far edges of
+   a full-bleed strip. That only holds because the dock's track is locked to its
+   rest width (lockTrack in the controller): the spring then grows its items
+   outside that track instead of widening the bar and shoving the brand and the
+   actions around on every pointer move. */
+.atd-modern__bar {
+  /* space-between is inherited rather than centred on purpose: at its natural
+     width the three groups already fill the box, and in a shell too narrow for
+     them the overflow then runs off the right instead of taking the brand off
+     the left as well */
+  width: max-content;
+  max-width: var(--atd-bar-width);
+  padding: var(--atd-bar-pad) var(--atd-bar-pad) var(--atd-bar-pad) var(--atd-bar-lead);
+}
+
+.atd-modern__dock {
+  display: flex;
+  flex: none;
+  gap: clamp(2px, 0.2cqw, 5px);
+  align-items: flex-start;
+  /* the track is one item tall and its rest width wide, and the row is centred
+     inside it, so a growing item overflows evenly on all four sides without
+     moving a single neighbour in the bar */
+  justify-content: center;
+  height: var(--atd-item-height);
+}
+
+.atd-modern__item,
+.atd-retro__item,
+.atd-glass__item {
+  display: inline-flex;
+  flex: none;
+  gap: var(--atd-gap);
+  align-items: center;
+  justify-content: center;
+  height: var(--atd-item-height);
+  padding: 0 var(--atd-item-pad);
+  outline: none;
+  white-space: nowrap;
+  transform-origin: 50% 0;
+  will-change: width, height, transform;
+  cursor: pointer;
+}
+
+.atd-modern__brand,
+.atd-glass__brand,
+.atd-retro__brand {
+  display: inline-flex;
+  flex: none;
+  gap: clamp(7px, 0.6cqw, 13px);
+  align-items: center;
+  text-decoration: none;
+}
+
+.atd-modern__mark,
+.atd-glass__mark {
+  display: block;
+  width: var(--atd-mark);
+  height: var(--atd-mark);
+  overflow: hidden;
+}
+
+.atd-modern__mark svg,
+.atd-glass__mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.atd-modern__word,
+.atd-glass__word {
+  font-size: var(--atd-brand);
+  font-weight: 600;
+  letter-spacing: -0.018em;
+}
+
+.atd-modern__actions {
+  display: inline-flex;
+  flex: none;
+  gap: clamp(4px, 0.34cqw, 8px);
+  align-items: center;
+}
+
+.atd-modern__ghost {
+  height: var(--atd-action-height);
+  padding: 0 clamp(12px, 0.95cqw, 20px);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: 500 var(--atd-label) / 1 inherit;
+  transition: color 0.16s, background 0.16s;
+  cursor: pointer;
+}
+
+.atd-modern__cta,
+.atd-glass__cta {
+  height: var(--atd-action-height);
+  border-radius: 999px;
+  font: 600 var(--atd-label) / 1 inherit;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s;
+  cursor: pointer;
+}
+
+/* ── Modern command bar ─────────────────────────────────────────────────── */
+
+.animated-top-dock-component.atd-modern {
+  /* a ceiling rather than a width: the command bar sizes itself to its own
+     cluster, and only falls back to an inset strip in a shell too narrow to
+     hold it */
+  --atd-bar-width: min(1240px, calc(100% - clamp(24px, 5cqw, 120px)));
+  background: #07080c;
+}
+
+.atd-modern__aurora {
+  position: absolute;
+  inset: -24% -12% auto -12%;
+  z-index: 1;
+  height: 82%;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 62% at 22% 36%, rgba(78, 116, 255, 0.4), transparent 68%),
+    radial-gradient(46% 56% at 78% 20%, rgba(186, 96, 255, 0.3), transparent 70%),
+    radial-gradient(40% 48% at 52% 6%, rgba(56, 220, 214, 0.2), transparent 72%),
+    radial-gradient(34% 40% at 50% 14%, rgba(255, 255, 255, 0.07), transparent 76%);
+  filter: blur(8px);
+}
+
+.atd-modern__bar {
+  gap: clamp(14px, 2.4cqw, 40px);
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(25, 27, 36, 0.86), rgba(12, 13, 18, 0.82));
+  box-shadow: 0 22px 52px -24px rgba(0, 0, 0, 0.92), inset 0 1px rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+.atd-modern__brand {
+  color: #f2f3f7;
+}
+
+.atd-modern__mark {
+  /* a full circle: the shared brand mark is a rounded square, so the disc is cut
+     from it by the mark box's own clip rather than by a second svg */
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+}
+
+.atd-modern__item {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: #9b9fae;
+  background: transparent;
+  font: 500 var(--atd-label) / 1 inherit;
+  letter-spacing: -0.005em;
+  transition: color 0.16s, border-color 0.18s, background 0.18s, box-shadow 0.18s, backdrop-filter 0.18s;
+}
+
+/* :hover is carried alongside the proximity flag so the glass still lands when
+   the spring is off — reduced motion, a coarse pointer, a narrow viewport */
+.atd-modern__item[data-dock-near="true"],
+.atd-modern__item:hover,
+.atd-modern__item:focus-visible {
+  color: #f4f5f9;
+  border-color: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: 0 8px 20px -14px rgba(0, 0, 0, 0.9), inset 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+
+.atd-modern__item[aria-pressed="true"] {
+  color: #0a0b10;
+  border-color: transparent;
+  background: linear-gradient(180deg, #ffffff, #dfe3ef);
+  box-shadow: 0 10px 24px -12px rgba(120, 150, 255, 0.75), inset 0 -1px rgba(0, 0, 0, 0.14);
+}
+
+.atd-modern__icon,
+.atd-glass__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+  opacity: 0.72;
+  transition: opacity 0.16s;
+}
+
+.atd-modern__icon svg,
+.atd-glass__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.atd-modern__item[data-dock-near="true"] .atd-modern__icon,
+.atd-modern__item[aria-pressed="true"] .atd-modern__icon,
+.atd-glass__item[data-dock-near="true"] .atd-glass__icon,
+.atd-glass__item[aria-pressed="true"] .atd-glass__icon {
+  opacity: 1;
+}
+
+.atd-modern__ghost {
+  color: #a7abba;
+}
+
+.atd-modern__ghost:hover {
+  color: #f0f1f6;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.atd-modern__cta {
+  display: inline-flex;
+  gap: var(--atd-gap);
+  align-items: center;
+  padding: 0 var(--atd-bar-pad) 0 clamp(14px, 1.1cqw, 24px);
+  border: 0;
+  color: #0a0b10;
+  background: linear-gradient(180deg, #ffffff, #d8ddec);
+  box-shadow: 0 10px 26px -14px rgba(150, 175, 255, 0.95), inset 0 -1px rgba(0, 0, 0, 0.16);
+}
+
+.atd-modern__cta svg {
+  box-sizing: border-box;
+  width: calc(var(--atd-action-height) - clamp(12px, 0.9cqw, 20px));
+  height: calc(var(--atd-action-height) - clamp(12px, 0.9cqw, 20px));
+  padding: clamp(4px, 0.3cqw, 7px);
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.1);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.atd-modern__cta:hover {
+  box-shadow: 0 16px 32px -14px rgba(150, 175, 255, 1), inset 0 -1px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
+.atd-modern__stage {
+  position: absolute;
+  top: 58%;
+  left: 50%;
+  z-index: 4;
+  width: min(88cqw, 1120px);
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.atd-modern__eyebrow {
+  margin: 0 0 clamp(8px, 0.9cqw, 18px);
+  color: #7d84a0;
+  font: 400 clamp(8px, 0.62cqw, 13px) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.atd-modern__headline {
+  /* background-clip: text paints only inside the element box, so at this size a
+     1.0-ish line-height would cut the ascenders and descenders out of the fill.
+     The padding buys the ink its own room back. */
+  margin: 0;
+  padding: 0.08em 0 0.14em;
+  color: transparent;
+  background: linear-gradient(180deg, #ffffff 16%, rgba(255, 255, 255, 0.3));
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-size: clamp(30px, 7.6cqw, 150px);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+/* ── Retro pixel terminal ───────────────────────────────────────────────────
+   The field canvas is a small drawing buffer stretched by CSS with
+   nearest-neighbour sampling, so its dither pattern arrives as real square
+   pixels. Every chrome edge here is square to sit on that same grid. */
+
+.animated-top-dock-component.atd-retro {
+  --atd-label: clamp(9px, 0.68cqw, 15px);
+  --atd-icon: clamp(10px, 0.78cqw, 17px);
+  --atd-brand: clamp(11px, 0.8cqw, 18px);
+  background: #0b0819;
+}
+
+.atd-retro__field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.atd-retro__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(124% 90% at 50% 34%, transparent 28%, rgba(6, 4, 16, 0.62) 100%),
+    linear-gradient(180deg, rgba(6, 4, 16, 0.6) 0%, transparent 24%, transparent 62%, rgba(6, 4, 16, 0.58) 100%);
+}
+
+/* the raster runs at screen resolution, not at the field's pixel scale, so the
+   line structure stays a raster instead of banding the chunky artwork */
+.atd-retro::before {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+  content: "";
+  opacity: calc(var(--atd-retro-scan, 0.32) * 1.5);
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px);
+}
+
+/* Horizontal fit: the bar is one continuous strip and the menu cells own all of
+   it. There are no gaps and no rounded ends — every cell is separated by a rule
+   and runs the full height, and the controller renormalises the widths so
+   opening one cell takes its room from the neighbours. */
+.atd-retro__bar {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid #f4e6c8;
+  background: #1a1030;
+  box-shadow: 6px 6px 0 rgba(6, 4, 16, 0.62);
+}
+
+.atd-retro__brand {
+  height: 100%;
+  padding: 0 clamp(12px, 1.1cqw, 26px);
+  border-right: 2px solid #4b2f7e;
+  color: #f9c74f;
+  background: #150c28;
+  font: 400 var(--atd-brand) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.12em;
+}
+
+.atd-retro__dock {
+  display: flex;
+  flex: 1 1 0;
+  gap: 0;
+  align-items: stretch;
+  min-width: 0;
+  height: 100%;
+}
+
+.atd-retro__badge {
+  display: inline-flex;
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+}
+
+.atd-retro__badge svg,
+.atd-retro__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+}
+
+.atd-retro__item {
+  height: 100%;
+  min-width: 0;
+  padding: 0 clamp(6px, 0.5cqw, 12px);
+  overflow: hidden;
+  border: 0;
+  border-right: 2px solid #4b2f7e;
+  color: #b9a7e8;
+  background: #241548;
+  font: 400 var(--atd-label) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  transition: color 0.1s steps(2), background 0.1s steps(2);
+}
+
+.atd-retro__item[data-dock-near="true"],
+.atd-retro__item:focus-visible {
+  color: #fff4d6;
+  background: #3a2170;
+}
+
+.atd-retro__item[aria-pressed="true"] {
+  color: #1a1030;
+  background: #f9c74f;
+}
+
+.atd-retro__icon {
+  display: inline-flex;
+  flex: none;
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+}
+
+.atd-retro__cta {
+  display: inline-flex;
+  flex: none;
+  gap: var(--atd-gap);
+  align-items: center;
+  height: 100%;
+  padding: 0 clamp(14px, 1.2cqw, 28px);
+  border: 0;
+  border-left: 2px solid #f4e6c8;
+  color: #1a1030;
+  background: #f47b5c;
+  font: 400 var(--atd-label) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  transition: background 0.1s steps(2), color 0.1s steps(2);
+  cursor: pointer;
+}
+
+.atd-retro__cta:hover {
+  color: #1a1030;
+  background: #f9c74f;
+}
+
+.atd-retro__readout {
+  position: absolute;
+  bottom: clamp(30px, 4.2cqw, 74px);
+  left: 50%;
+  z-index: 8;
+  display: flex;
+  gap: clamp(12px, 2.4cqw, 42px);
+  margin: 0;
+  color: #a08fd4;
+  font: 400 clamp(9px, 0.62cqw, 13px) / 1 "ThreeUI Fragment Mono", ui-monospace, monospace;
+  letter-spacing: 0.2em;
+  transform: translateX(-50%);
+}
+
+/* ── Liquid glass ───────────────────────────────────────────────────────────
+   Vertical fit: the dock leaves the top edge for a rail down the left side. The
+   proximity field runs on the y axis, so an item grows taller and leans out to
+   the right instead of widening and dropping. The rail is a real
+   backdrop-filter panel over the refracting Three.js bead field, so its blur
+   samples the same pixels the glass shader refracts. */
+
+.animated-top-dock-component.atd-glass {
+  --atd-rail-width: clamp(158px, 12.5cqw, 250px);
+  background: #08090d;
+}
+
+.atd-glass__field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* a scrim behind the rail: the bead field is bright enough in places to swallow
+   the wordmark, and the panel's own blur cannot darken what it samples */
+.atd-glass::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 5;
+  width: 42%;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(90deg, rgba(6, 7, 11, 0.66), rgba(6, 7, 11, 0));
+}
+
+.atd-glass__rail {
+  position: absolute;
+  top: 50%;
+  left: clamp(20px, 3.4cqw, 68px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 0.5cqw, 11px);
+  align-items: stretch;
+  width: var(--atd-rail-width);
+  padding: var(--atd-bar-pad);
+  border-radius: clamp(20px, 1.7cqw, 34px);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+  box-shadow:
+    0 30px 64px -26px rgba(0, 0, 0, 0.92),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(26px) saturate(190%);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  transform: translateY(-50%);
+}
+
+.atd-glass__rail::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  border-radius: inherit;
+  background: linear-gradient(168deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0) 76%, rgba(255, 255, 255, 0.14) 100%);
+}
+
+.atd-glass__brand {
+  position: relative;
+  padding: clamp(6px, 0.5cqw, 12px) clamp(8px, 0.7cqw, 15px);
+  color: #fbfbfe;
+}
+
+.atd-glass__mark {
+  border-radius: clamp(7px, 0.5cqw, 11px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.atd-glass__hairline {
+  height: 1px;
+  margin: clamp(2px, 0.2cqw, 5px) clamp(6px, 0.5cqw, 12px);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.04));
+}
+
+.atd-glass__dock {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(2px, 0.2cqw, 5px);
+  align-items: stretch;
+}
+
+.atd-glass__item {
+  justify-content: flex-start;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: clamp(12px, 1cqw, 22px);
+  color: rgba(255, 255, 255, 0.66);
+  background: transparent;
+  font: 500 var(--atd-label) / 1 inherit;
+  letter-spacing: -0.005em;
+  /* the rail grows downward from each item's own top edge */
+  transform-origin: 0 50%;
+  transition: color 0.18s, border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.atd-glass__item[data-dock-near="true"],
+.atd-glass__item:focus-visible {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.24);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.46), 0 8px 18px -10px rgba(0, 0, 0, 0.8);
+}
+
+.atd-glass__item[aria-pressed="true"] {
+  color: #0d0f16;
+  border-color: rgba(255, 255, 255, 0.6);
+  background: linear-gradient(180deg, #ffffff, #e6e9f4);
+  box-shadow: 0 10px 24px -12px rgba(255, 255, 255, 0.5), inset 0 -1px rgba(0, 0, 0, 0.14);
+}
+
+.atd-glass__cta {
+  display: inline-flex;
+  gap: var(--atd-gap);
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 clamp(12px, 1cqw, 22px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  color: #0d0f16;
+  background: linear-gradient(180deg, #ffffff, #dfe3f0);
+  box-shadow: 0 12px 30px -14px rgba(255, 255, 255, 0.6), inset 0 -1px rgba(0, 0, 0, 0.16);
+}
+
+.atd-glass__cta svg {
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.atd-glass__cta:hover {
+  box-shadow: 0 16px 34px -14px rgba(255, 255, 255, 0.75), inset 0 -1px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+}
+
+.atd-modern .animated-top-dock-component__caption,
+.atd-glass .animated-top-dock-component__caption {
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.atd-retro .animated-top-dock-component__caption {
+  z-index: 12;
+  color: #7b6ab0;
+}
+
+@container (max-width: 900px) {
+  .atd-modern__ghost {
+    display: none;
+  }
+
+  .atd-modern__item span:last-child,
+  .atd-retro__item span:last-child {
+    display: none;
+  }
+
+  /* the bar is sized by its content now, so a shell this narrow has to give the
+     content back: the call to action drops to its glyph rather than pushing the
+     cluster past the bar's own max width */
+  .atd-modern__cta span {
+    display: none;
+  }
+
+  .atd-modern__cta {
+    padding: 0 var(--atd-bar-pad);
+  }
+
+  /* the rail collapses to its icons rather than keeping a 158 px column in a
+     card that is only a few hundred pixels wide */
+  .animated-top-dock-component.atd-glass {
+    --atd-rail-width: auto;
+  }
+
+  .atd-glass__item {
+    justify-content: center;
+  }
+
+  .atd-glass__item span:last-child,
+  .atd-glass__word,
+  .atd-glass__cta span {
+    display: none;
+  }
+
+  .atd-glass__cta {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .atd-modern__word {
+    display: none;
+  }
+
+  .atd-modern__item {
+    height: 28px !important;
+    transform: none !important;
+  }
+
+  .atd-glass__item {
+    height: auto !important;
+    transform: none !important;
+  }
+
+  /* the strip keeps its full-height cells on a phone; only the spring stops */
+  .atd-retro__item {
+    height: 100% !important;
+    transform: none !important;
+  }
+
+  .atd-modern__stage {
+    top: 62%;
+  }
+
+  .atd-retro__readout {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atd-modern__item,
+  .atd-retro__item,
+  .atd-glass__item {
+    transform: none !important;
+  }
+}
+```
