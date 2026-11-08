@@ -24,14 +24,20 @@ export interface SkillCategory {
 
 export const PERSONAL_INFO = {
   name: 'Zain Ahmed Patel',
-  title: 'Front-End Developer | SEO Specialist | Vibe Coder & Prompt Engineer',
+  title: 'Founder of ShadowTalk AI | Front-End Engineer & Technical SEO Architect',
   tagline:
-    'Combining modern SEO, AI-assisted development, and prompt engineering to build fast, search-friendly, and user-centered web experiences.',
+    'Founder of ShadowTalk AI. Architecting high-performance search-dominant web systems, generative engine optimization (GEO), and production-grade agentic AI workspaces.',
   email: 'zaim98269@gmail.com',
   phone: '+92 321 1798561',
   location: 'Karachi, Pakistan (Open to Remote Worldwide)',
+  flagship: {
+    name: 'ShadowTalk AI',
+    url: 'https://www.shadowtalk-ai.com',
+    role: 'Founder & Lead Architect',
+    description: 'Autonomous multi-tool agentic AI workspace, deep research canvas, and encrypted terminal desktop platform.',
+  },
   summary:
-    'Front-end focused developer who combines modern SEO, AI-assisted (vibe) coding and prompt engineering to build fast, search-friendly and user-centered web experiences. Skilled in keyword research, structured content strategy, on-page optimization and schema markup, and in turning ideas into working apps with tools such as Claude Code, Cursor and GitHub Copilot. Certified across SEO, GenAI/GEO, vibe coding and Google prompting, with a data-driven mindset focused on visibility, engagement and polished UI.',
+    'Founder and Lead Architect of ShadowTalk AI (shadowtalk-ai.com) — his flagship, biggest, and most successful project, an autonomous multi-tool AI workspace engineered to move beyond traditional chatbots. Front-end engineer and technical SEO architect combining modern Generative Engine Optimization (GEO), agentic coding loops, and prompt engineering to build search-dominant, high-velocity digital experiences certified across IBM, Google, and Scrimba.',
   strengths: [
     {
       title: 'Data-Informed Decision Making',

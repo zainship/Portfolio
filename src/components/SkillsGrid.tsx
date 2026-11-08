@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, Code2, Terminal, Cpu, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Search, Sparkles, Code2, Terminal, Cpu, ChevronRight, CheckCircle2, X } from 'lucide-react';
 import { SKILL_CATEGORIES, SkillCategory } from '../data/portfolioData';
 
 export const SkillsGrid: React.FC = () => {
@@ -23,7 +23,7 @@ export const SkillsGrid: React.FC = () => {
   };
 
   return (
-    <section id="skills" className="py-20 border-t border-slate-200 dark:border-slate-800">
+    <section id="skills" className="py-24 border-t border-slate-200 dark:border-white/[0.08] relative">
       <div className="max-w-6xl mx-auto px-6">
         
         {/* Section Header */}
@@ -35,7 +35,7 @@ export const SkillsGrid: React.FC = () => {
             Core Skills &amp; Areas of Expertise
           </h2>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 mt-2">
-            Structured around high-impact search architecture, front-end implementation, and AI prompt engineering.
+            Structured around high-impact search architecture, production front-end engineering, and enterprise AI prompt systems.
           </p>
         </div>
 
@@ -46,7 +46,7 @@ export const SkillsGrid: React.FC = () => {
             return (
               <div
                 key={skill.id}
-                className={`p-6 rounded-2xl glass-card glass-card-interactive flex flex-col justify-between group cursor-pointer ${
+                className={`p-6 sm:p-7 rounded-2xl glass-card glass-card-interactive flex flex-col justify-between group cursor-pointer border border-slate-200 dark:border-white/[0.08] ${
                   isWide ? 'md:col-span-2 lg:col-span-2' : ''
                 }`}
                 onClick={() => setSelectedSkill(skill)}
@@ -55,9 +55,9 @@ export const SkillsGrid: React.FC = () => {
                   {/* Card Top: Index & Icon */}
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-mono text-slate-400 font-semibold">
-                      0{index + 1}. DISCIPLINE
+                      0{index + 1}. Domain
                     </span>
-                    <div className="w-9 h-9 rounded-xl glass-subtle flex items-center justify-center transition-transform group-hover:scale-110">
+                    <div className="w-9 h-9 rounded-xl glass-subtle flex items-center justify-center transition-transform group-hover:scale-105">
                       {getIcon(skill.icon)}
                     </div>
                   </div>
@@ -71,21 +71,20 @@ export const SkillsGrid: React.FC = () => {
                   </p>
 
                   {/* Clean unboxed tags with typographic separators */}
-                  <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80">
+                  <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/[0.08]">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-slate-500 dark:text-slate-400 font-mono">
                       {skill.tags.map((tag, tIndex) => (
                         <React.Fragment key={tag}>
                           <span className="text-slate-700 dark:text-slate-300">{tag}</span>
-                          {tIndex < skill.tags.length - 1 && <span className="text-slate-300 dark:text-slate-700">·</span>}
+                          {tIndex < skill.tags.length - 1 && <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">·</span>}
                         </React.Fragment>
                       ))}
                     </div>
                   </div>
                 </div>
 
-                {/* Card Action footer */}
-                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                  <span>View Breakdown &amp; Workflows</span>
+                <div className="mt-6 pt-3 flex items-center justify-between text-xs font-mono text-emerald-600 dark:text-emerald-400">
+                  <span>View Details</span>
                   <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </div>
               </div>
@@ -93,72 +92,63 @@ export const SkillsGrid: React.FC = () => {
           })}
         </div>
 
-        {/* Modal: Deep Dive on Selected Skill */}
+        {/* Skill Detail Modal */}
         {selectedSkill && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
             onClick={() => setSelectedSkill(null)}
           >
             <div
-              className="w-full max-w-lg p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl relative"
+              className="glass-card max-w-xl w-full p-8 rounded-2xl border border-white/20 shadow-2xl space-y-6 relative"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                    {getIcon(selectedSkill.icon)}
-                  </div>
-                  <div>
-                    <div className="text-xs font-mono text-emerald-500 uppercase tracking-wider">
-                      Area of Expertise
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                      {selectedSkill.title}
-                    </h3>
-                  </div>
+              <button
+                onClick={() => setSelectedSkill(null)}
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="space-y-2">
+                <div className="text-xs font-mono font-semibold uppercase text-emerald-400">
+                  Competency Specification
                 </div>
-                <button
-                  onClick={() => setSelectedSkill(null)}
-                  className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  aria-label="Close dialog"
-                >
-                  ✕
-                </button>
+                <h3 className="text-2xl font-bold text-white">
+                  {selectedSkill.title}
+                </h3>
+                <p className="text-sm text-slate-300 leading-relaxed pt-2">
+                  {selectedSkill.fullDesc}
+                </p>
               </div>
 
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mt-4">
-                {selectedSkill.fullDesc}
-              </p>
-
-              <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800">
-                <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">
-                  Core Implementation Areas
+              <div className="space-y-3 pt-4 border-t border-white/10">
+                <div className="text-xs font-mono uppercase text-slate-400">
+                  Technological Capabilities &amp; Standards
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="flex flex-wrap gap-2">
                   {selectedSkill.tags.map((tag) => (
-                    <div
+                    <span
                       key={tag}
-                      className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300"
+                      className="px-3 py-1.5 text-xs font-mono text-slate-300 rounded-lg glass-subtle border border-white/10"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>{tag}</span>
-                    </div>
+                      {tag}
+                    </span>
                   ))}
                 </div>
               </div>
 
-              <div className="mt-8 flex justify-end">
+              <div className="pt-4 flex justify-end">
                 <button
                   onClick={() => setSelectedSkill(null)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  className="px-5 py-2 text-xs font-semibold rounded-lg bg-emerald-400 hover:bg-emerald-300 text-slate-950 transition-colors"
                 >
-                  Close
+                  Close Specification
                 </button>
               </div>
             </div>
           </div>
         )}
-
       </div>
     </section>
   );

@@ -22,6 +22,7 @@ import {
   OperationType,
   handleFirestoreError
 } from '../lib/firebase';
+import { SignUpButton } from '../shaders/sign-up-button/SignUpButton';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import {
   collection,
@@ -269,23 +270,30 @@ export const TrafficConsole: React.FC<TrafficConsoleProps> = ({ isOpen, onClose 
 
           {/* Conditional Admin View vs Visitor View */}
           {!user ? (
-            <div className="p-8 rounded-2xl glass-subtle text-center space-y-4">
-              <Shield className="w-12 h-12 text-slate-400 mx-auto" />
+            <div className="p-8 rounded-2xl glass-subtle text-center space-y-6 flex flex-col items-center">
               <div className="space-y-1">
+                <Shield className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-90" />
                 <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                  Owner / Admin Authentication
+                  Owner &amp; Admin Authentication
                 </h4>
                 <p className="text-xs text-slate-400 max-w-md mx-auto">
-                  Sign in with <strong className="text-emerald-400">zaim98269@gmail.com</strong> to view real-time traffic logs, visitor user agents, and read client messages submitted via your contact form.
+                  Click the interactive capsule button below to authenticate with <strong className="text-emerald-400">zaim98269@gmail.com</strong> (or any Google account) to unlock the Firebase traffic monitoring and client inquiries console.
                 </p>
               </div>
-              <button
-                onClick={handleSignIn}
-                className="px-6 py-2.5 text-xs font-semibold rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 transition-colors inline-flex items-center gap-2"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Sign in with Google</span>
-              </button>
+
+              {/* Tactile 3D Capsule Sign-In Button with liquid orb, envelope animation & fingerprint */}
+              <div className="flex flex-col items-center justify-center -my-2">
+                <SignUpButton
+                  label="SIGN IN"
+                  onClick={handleSignIn}
+                  width={305}
+                  height={116}
+                />
+                <span className="text-[11px] font-mono text-slate-400 mt-2 flex items-center gap-1.5">
+                  <LogIn className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Click capsule to trigger Google Sign-In with Firebase</span>
+                </span>
+              </div>
             </div>
           ) : !isAdmin ? (
             <div className="p-8 rounded-2xl glass-subtle text-center space-y-3">

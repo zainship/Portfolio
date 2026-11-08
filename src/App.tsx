@@ -2,17 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { About } from './components/About';
+import { SelectedProjects } from './components/SelectedProjects';
 import { SkillsGrid } from './components/SkillsGrid';
 import { Certifications } from './components/Certifications';
 import { InteractiveLab } from './components/InteractiveLab';
 import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
 import { ExportModal } from './components/ExportModal';
-import { CursorTrail } from './components/CursorTrail';
 import { TrafficConsole } from './components/TrafficConsole';
-import { BackgroundControls } from './components/BackgroundControls';
-import { GlobeCollection, GlobeVariant } from './shaders/globe/GlobeCollection';
-import './shaders/threeui.css';
 import { testConnection, logTrafficEvent } from './lib/firebase';
 
 export default function App() {
@@ -20,12 +17,6 @@ export default function App() {
   const [exportModalOpen, setExportModalOpen] = useState<boolean>(false);
   const [trafficModalOpen, setTrafficModalOpen] = useState<boolean>(false);
   const [selectedCertId, setSelectedCertId] = useState<string | null>(null);
-
-  // Background WebGL shader states
-  const [globeVariant, setGlobeVariant] = useState<GlobeVariant>('energy-orb');
-  const [orbHue, setOrbHue] = useState<number>(0); // 0 = author's cosmic violet/indigo
-  const [orbSpeed, setOrbSpeed] = useState<number>(1.0);
-  const [interactiveMode, setInteractiveMode] = useState<boolean>(false);
 
   // Initialize theme from localStorage or default to dark
   useEffect(() => {
@@ -60,7 +51,6 @@ export default function App() {
   const handleOpenCertModal = (certId?: string) => {
     if (certId) {
       setSelectedCertId(certId);
-      // Also scroll smoothly to certifications section
       const certEl = document.getElementById('certifications');
       if (certEl) {
         certEl.scrollIntoView({ behavior: 'smooth' });
@@ -69,47 +59,18 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 transition-colors duration-200 relative overflow-x-hidden">
-      {/* Interactive WebGL Globe / Energy Orb Background */}
-      <div
-        className={`fixed inset-0 -z-30 overflow-hidden transition-opacity duration-700 ${
-          interactiveMode ? 'pointer-events-auto' : 'pointer-events-none'
-        }`}
-        style={{
-          background: '#05030e',
-        }}
-      >
-        <GlobeCollection
-          variant={globeVariant}
-          speed={orbSpeed}
-          scale={1.0}
-          smokeScale={1.0}
-          smokeStrength={1.0}
-          smokeSpeed={1.0}
-          hue={orbHue}
-          saturation={1.0}
-          glow={1.0}
-          starDensity={1.0}
-          starSpeed={1.0}
-          starSize={1.0}
-          brightness={1.0}
-          opacity={1.0}
-        />
+    <div className="min-h-screen bg-slate-50 dark:bg-[#08090d] text-slate-900 dark:text-slate-100 transition-colors duration-200 relative overflow-x-hidden">
+      
+      {/* Architectural Minimalist Canvas & Subtle Micro-Grid */}
+      <div className="fixed inset-0 -z-30 pointer-events-none bg-slate-50 dark:bg-[#08090d]" />
+      <div className="fixed inset-0 -z-20 pointer-events-none bg-architectural-grid opacity-50 dark:opacity-60 [mask-image:radial-gradient(ellipse_at_50%_0%,black_35%,transparent_85%)]" />
+      
+      {/* Quiet, measured top ambient aura (strictly controlled color budget) */}
+      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden opacity-30 dark:opacity-40">
+        <div className="absolute -top-36 left-1/2 -translate-x-1/2 w-[920px] h-[360px] bg-gradient-to-b from-emerald-500/12 via-cyan-500/08 to-transparent rounded-full blur-[140px]" />
       </div>
 
-      {/* Gentle Frosted Scrim & Ambient Light Mesh for Glassmorphic Refraction */}
-      <div className="fixed inset-0 pointer-events-none -z-20 bg-slate-950/45 backdrop-blur-[0.5px]" />
-      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden opacity-50">
-        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-emerald-500/12 rounded-full blur-[160px]" />
-        <div className="absolute top-1/4 -right-40 w-[650px] h-[650px] bg-cyan-500/12 rounded-full blur-[180px]" />
-        <div className="absolute top-1/2 left-1/3 -translate-x-1/2 w-[700px] h-[500px] bg-indigo-500/10 rounded-full blur-[200px]" />
-        <div className="absolute -bottom-32 right-1/4 w-[650px] h-[650px] bg-cyan-500/10 rounded-full blur-[180px]" />
-      </div>
-
-      {/* Custom Animated Neon Cursor Trail (performant, canvas-based, pointer-events-none) */}
-      <CursorTrail />
-
-      {/* Top Bar Navigation */}
+      {/* Top Bar Navigation (Strict 3-zone contract) */}
       <Navbar
         isDark={isDark}
         onToggleTheme={handleToggleTheme}
@@ -119,29 +80,32 @@ export default function App() {
 
       {/* Main Content Layout */}
       <main id="main-content">
-        {/* Hero Section */}
+        {/* Architectural Hero Section */}
         <Hero onOpenCertModal={handleOpenCertModal} />
 
-        {/* Professional Summary & Strengths */}
+        {/* Professional Summary & Core Principles */}
         <About />
 
-        {/* Core Skills & Areas of Expertise */}
+        {/* Selected Works & Architecture Case Studies */}
+        <SelectedProjects />
+
+        {/* Core Skills & Technical Depth */}
         <SkillsGrid />
 
-        {/* Verified Coursera Certifications */}
+        {/* Verified Coursera Specializations (IBM · Scrimba · Google) */}
         <Certifications
           selectedCertId={selectedCertId}
           onSelectCert={(id) => setSelectedCertId(id)}
         />
 
-        {/* Interactive GEO, Vibe Coding & Prompting Lab */}
+        {/* Interactive Technical Architecture & Search Lab */}
         <InteractiveLab />
 
-        {/* Contact & Inquiry Section */}
+        {/* Contact & Inquiries (Atomic Firebase Persistence) */}
         <ContactSection />
       </main>
 
-      {/* Footer */}
+      {/* Executive Footer */}
       <Footer onOpenExport={() => setExportModalOpen(true)} />
 
       {/* Export Standalone HTML Modal */}
@@ -150,22 +114,10 @@ export default function App() {
         onClose={() => setExportModalOpen(false)}
       />
 
-      {/* Firebase Traffic Monitor & Authentication Console */}
+      {/* Firebase Real-Time Inquiries & Traffic Console */}
       <TrafficConsole
         isOpen={trafficModalOpen}
         onClose={() => setTrafficModalOpen(false)}
-      />
-
-      {/* Floating Shader Background Controls (Variant Switcher, Hue, Interactive Mode) */}
-      <BackgroundControls
-        currentVariant={globeVariant}
-        onChangeVariant={(v) => setGlobeVariant(v)}
-        hue={orbHue}
-        onChangeHue={(h) => setOrbHue(h)}
-        speed={orbSpeed}
-        onChangeSpeed={(s) => setOrbSpeed(s)}
-        interactiveMode={interactiveMode}
-        onToggleInteractive={() => setInteractiveMode((prev) => !prev)}
       />
     </div>
   );
